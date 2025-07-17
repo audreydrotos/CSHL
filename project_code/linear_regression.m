@@ -85,7 +85,7 @@ idx = 1:stepSize:size(smoothedTensor,2);
 tensorPCA = smoothedTensor(:,idx,:);
 
 % subset for our neurons
-region_code = 3; % LGd
+region_code = 10; % LGd
 region_idx = neurons.region == region_code;
 region_neurons = tensorPCA(region_idx, :, :);
 
@@ -99,7 +99,8 @@ accuracy = [];
 cv = cvpartition(y,'KFold', 5);
 
 % perform decoding across time windows
-parfor w = 1:size(neuron_data,2)
+parfor w = 1:size(region_neurons,2)
+    % go across each time window
     x_window = squeeze(region_neurons(:,w,:));
     x = x_window';
 
@@ -122,3 +123,8 @@ parfor w = 1:size(neuron_data,2)
 end
 
 plot(accuracy)
+hold on
+ylim([0 100])
+ylabel('Accuracy')
+xlabel('Time')
+hold off
