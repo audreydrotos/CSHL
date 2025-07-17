@@ -75,13 +75,38 @@ xline(length(unique(rightStim)))
 
 %% predict neural activity based on behavioral data
 % from neural activity predict across TIME to see when prediction is
-% highest for the sound
-parfor i = 1:nNeurons
-    % what do we want to predict with SVM
-    y = rightStim;
+% highest for the sound. predict once for every time window.
 
-    % which data to use
-    neuron_data = region_neurons(i,:,:);
-    neuron_data = squeeze(neuron_data);
-    neuron_data = neuron_data'; % flip so this is rows = trials and columns = binned spike times
-    x = neuron_data;
+% what do we want to predict with SVM
+y = rightStim;
+
+% initialize matrix
+accuracy = [];
+
+% 5 fold cross validation
+cv = cvpartition(y,'KFold', 5);
+
+% perform decoding across time windows
+for w = 1:size(neuron_data,2)
+    x_window = squeeze(region_neurons(:,2,:));
+    x = x_window';
+
+    % initialize matrix
+    acc = zeros(cv.NumTestSets,1);
+    
+    % train and test the model
+    for i = 1:cv.NumTestSets
+        trainX = x(cv.training(i),:);
+        testX = x(cv.test(i),:);
+        trainY = y(cv.training(i));
+        testY = y(cv.test(i));
+
+        model = fitcecoc(trainX, trainY);
+        pred = predict(model, testX);
+        acc(i) = mean(pred == testY);
+    end
+
+    accuracy(w) = mean(acc) * 100;
+end
+
+plot(accuracy)

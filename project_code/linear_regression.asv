@@ -5,9 +5,13 @@ load('binnedTensor.mat')
 leftStim = S.trials.visualStim_contrastLeft;
 rightStim = S.trials.visualStim_contrastRight;
 
+region_code = 3; % LGd
+region_idx = neurons.region == region_code;
+region_neurons = binnedTensor(region_idx, :, :);
+
 % predict the right contrast stimulus from the data
 % for each individual neuron
-nNeurons = size(binnedTensor,1);
+nNeurons = size(region_neurons,1);
 
 accuracy_matrix = zeros(1,nNeurons);
 accuracy_matrix_shuffled = zeros(1,nNeurons);
@@ -18,7 +22,7 @@ parfor i = 1:nNeurons
     y = rightStim;
 
     % which data to use
-    neuron_data = binnedTensor(i,:,:);
+    neuron_data = region_neurons(i,:,:);
     neuron_data = squeeze(neuron_data);
     neuron_data = neuron_data'; % flip so this is rows = trials and columns = binned spike times
     x = neuron_data;
@@ -71,4 +75,38 @@ xline(length(unique(rightStim)))
 
 %% predict neural activity based on behavioral data
 % from neural activity predict across TIME to see when prediction is
-% highest for the sound
+% highest for the sound. predict once for every time window.
+
+% what do we want to predict with SVM
+y = rightStim;
+
+% which data to use
+neuron_data = mean(region_neurons,);
+neuron_data = squeeze(neuron_data);
+neuron_data = neuron_data'; % flip so this is rows = trials and columns = binned spike times
+x = neuron_data;
+
+% initialize matrix
+accuracy = [];
+
+% 5 fold cross validation
+cv = cvpartition(labels,'KFold', 5);
+
+% perform decoding across time windows
+for w = 1:size(neuron_data,2)
+    x_window = squeeze(region_neurons(:,2,:));
+    x = x_window';
+
+    acc = zeros(cv.NumTestSets,1);
+    for i = 1:cv.NumTestSets
+        trainX = X(cv.training(i),:);
+        testX = X(cv.test(i),:);
+        trainY = labels(cv.training(i));
+        testY = labels(cv.test(i));
+
+        model = fitcecoc(trainX, trainY);
+        pred = predict(model, testX);
+        acc(i) = mean(pred == testY);
+    end
+    accuracy(w) = mean(acc) * 100;
+end
