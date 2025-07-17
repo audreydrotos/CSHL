@@ -1,0 +1,280 @@
+%Welcome to the classification tutorial with GLM 
+clear all
+close all
+clc
+
+%% Step 1: Use the data loader (a_dataLoader) to load the 'Cori 2016-12-14' session 
+%This session is very special, in the following ways:
+%It includes >150 neurons in a motor area (MOs)
+%It includes >200 neurons in a visual area(VISp)
+%The animal did >200 trials 
+
+%In this tutorial, you will explore the excitement that can be experienced
+%at the intersection of two wonderful worlds: 
+%That of big neural data and classification models. 
+
+%We will guide you through this exercise, but on top of that, you will
+%periodically be asked to *DO* stuff. 
+%In other words, write, tweak or modify the code in some places. 
+%These spots in the code are flagged by a comment flag, as such:
+%****************************************************************
+%*ACTION POTENTIAL: Put the right session name in session                                             
+%****************************************************************
+sessionId = 'Moniz_2017-05-16';
+a_dataLoader %Make sure to run this from the directory above your 
+             %data directory, or you will get errors (set path)           
+
+%Please try doing this for yourself, before peeking at the solution file. 
+%That's where active learning is happening. 
+%But if you try for more than a few minutes per flag, maybe do have a look
+%before things get too frustrating.
+
+%% Step 2: Represent the trial structure over the session 
+n = trials.N; %How many trials?
+trialStructure = double([trials.isStimulus trials.isMovement trials.visStimTime trials.responseTime]); %Take information out of the trial structure and in a "design matrix", as numbers
+figure; imagesc(trialStructure(:,1:2)); colorbar; colormap("gray"); shg 
+%White = on, col1 = stimulus1, col2 = animal responded
+
+%% Step 3: Parse spike train to compute spike counts per trial and neuron
+windowSize = 500; %Integration window of spiking activity in ms
+windowSize = windowSize./1000; %Convert to seconds, the time unit of the data
+
+%We will be comparing spiking activity in two regions, one visual and one
+%motor
+%****************************************************************
+%*ACTION POTENTIAL: Look in the region table to identify the right rows                                            
+%****************************************************************
+
+reg1 = 10; %VISp, the visual area
+reg2 = 3; %LGD
+%Make sure this is correct. Otherwise, nothing will make sense
+
+%Now, we will be invoking the actual parsing function
+%This parsing function yields spikeCounts per trial (rows) and neurons (columns) 
+spikesRegion1 = p_spikeParser(reg1,trialStructure,windowSize,neurons,S,n);
+spikesRegion2 = p_spikeParser(reg2,trialStructure,windowSize,neurons,S,n);
+
+%% Plot a histogram for comparing population activity 
+
+% Average across each row for the first
+VIspVisualResp = spikesRegion1(:,:,1);
+VIspVRAvg = mean(VIspVisualResp, 2); % should be across all neurons
+
+LGDVisualResp = spikesRegion2(:,:,1);
+LGDVisualRespA = mean(LGDVisualResp, 2);
+
+% Plot these both on the same plot
+plot(VIspVRAvg)
+hold on
+plot(LGDVRAvg)
+hold off
+
+%% Step 4: Let's look at spiking of all neurons to all conditions in all regions.
+%This is EDA (not to be confused with EDM)
+figure; colormap('jet'); 
+fS = 26; %Font size
+subplot(2,2,1)
+imagesc(spikesRegion1(:,:,1)); caxis([0 max([spikesRegion1(:); spikesRegion2(:)])]); colorbar
+xlabel('Neuron'); ylabel('Trial'); title('VISp, visual response'); movshonize(fS,1);
+subplot(2,2,2)
+imagesc(spikesRegion2(:,:,1)); caxis([0 max([spikesRegion1(:); spikesRegion2(:)])]); colorbar
+xlabel('Neuron'); ylabel('Trial'); title('LGd, visual response');movshonize(fS,1);
+subplot(2,2,3)
+imagesc(spikesRegion1(:,:,2)); caxis([0 max([spikesRegion1(:); spikesRegion2(:)])]); colorbar
+xlabel('Neuron'); ylabel('Trial'); title('VISp, motor response'); movshonize(fS,1);
+subplot(2,2,4)
+imagesc(spikesRegion2(:,:,2)); caxis([0 max([spikesRegion1(:); spikesRegion2(:)])]); colorbar
+xlabel('Neuron'); ylabel('Trial'); title('LGd, motor response');movshonize(fS,1);
+makeWhite
+
+%How would you summarize the visual appearance of these figures?
+%Do they mesh with the general thrust of the Steinmetz paper?
+
+%% Step 5: "Poor man's" PCA: We look at the spiking activity of the whole population, per trial
+%Treating every unit equally
+
+populationActivity =    [sum(spikesRegion1(:,:,1)')' ... 
+                         sum(spikesRegion1(:,:,2)')' ...
+                         sum(spikesRegion2(:,:,1)')' ... 
+                         sum(spikesRegion2(:,:,2)')'];
+%This array will contain the population activity per trial (in the rows).
+%Each column represents a type: 
+%1: Visual region, visual evoked activity
+%2: Visual region, motor activity
+%3: Motor region, visual evoked activity
+%4: Motor region, motor activity
+
+%Plotting it as a function of trial
+figure
+sortedPopulationActivity = sortrows(populationActivity,-1);
+h1 = plot(sortedPopulationActivity(:,1),'color','b','linewidth',3);
+hold on
+h2 = plot(sortedPopulationActivity(:,2),'color','c','linewidth',3);
+h3 = plot(sortedPopulationActivity(:,3),'color','r','linewidth',3);
+h4 = plot(sortedPopulationActivity(:,4),'color','m','linewidth',3);
+legend([h1, h2, h3, h4],{'Visual Resp. VIsp', 'Visual Resp. LGd', 'Motor Resp. VIsp', 'Motor Resp. LGd'})
+xlabel('Trials')
+ylabel('Spike count (population activity)')
+movshonize(36,1); axis normal; makeWhite; shg
+
+%% Step 6: Put the population activity into condition buckets
+spikeBucket = cell(2,2,4); %2 kinds of trials (V/M), on vs. off, then 2 regions x 2 activity windows (4 total)
+for ii = 1:2 %Go through both kinds of trials 
+    for jj = 0:1 %Go through both kinds of possibilities (on vs. off)
+        for kk = 1:4 %Go through all 4 columns of population activity
+        spikeBucket{ii,jj+1,kk} = populationActivity(find(trialStructure(:,ii)==jj),kk);
+        end
+    end
+end
+
+%This code puts the spikes from each trial in the right bucket (combination
+%of trial type, stimulus/response being present, region and activity window
+%Make sure you understand this code before proceeding. 
+%A choice point is coming up that determines the rest of the analysis.
+
+%% Step 7: Plot the spike counts
+%Pick a condition you want to contrast - a condition is a combination
+%of trial type (visual stimulus vs. movement), activity window and region.
+visuoMotor = 1; %1 = Visual stimulus trials, 2 = Motor response trials
+popAct = 1; %1 = Visual area, visual response window
+            %2 = Visual area, motor activity window
+            %3 = Motor area, visual response window
+            %4 = Motor area, motor activity window
+spikes0 = spikeBucket{visuoMotor,0+1,popAct}; %Stimulus was off or animal was inactive
+spikes1 = spikeBucket{visuoMotor,1+1,popAct}; %Stimulus was on or animal was moving
+figure
+plot(spikes0,0,'.','color','k','MarkerSize',24)
+hold on
+plot(spikes1,1,'.','color','k','MarkerSize',24)
+xlabel('Spike counts')
+ylabel('Something happened?')
+set(gca,'YTick',[0 1])
+movshonize(36,1)
+makeWhite
+shg
+hold on
+
+%Note: You can pick one of 8 possible unique combinations of visuoMotor
+%trial and popAct. Pick one for now, and then go through the next few steps
+%before coming back here and picking another one. Can you find the
+%condition that gives you the best separability?
+
+%% Step 8: Fit the logistic curve to this data
+X = [spikes0; spikes1]; %Glue predictors (population spike counts) together
+Y = [zeros(length(spikes0),1);ones(length(spikes1),1)]; %Glue outcomes (0 or 1) together
+
+[betas fitQuality stats] = glmfit(X,Y,"binomial", "link","logit") %This is logistic regression
+
+XY = [X Y]; %We now sort the x's and y's. This is not important for fitting but for plotting
+XY = sortrows(XY,1); %In order of x
+X = XY(:,1); Y = XY(:,2);
+
+num =  exp(betas(1)+betas(2).*X); %Numerator
+denom = 1 + exp(betas(1)+betas(2).*X); %Denominator
+p = num./denom;
+plot(X,p,'color',[1 140/255 0],'linewidth',3)
+shg
+
+%Inspect the logistic fit. 
+%Is it a good fit? 
+%Is it reasonable, given the underlying data?
+
+%% Step 9: Compute AUROC
+
+[x,y,t,AUROC] = perfcurve(Y,p,1) %Determine AUC (ROC)
+figure
+plot(x,y,'color','k','LineWidth',3);
+title(['Area under the ROC curve = ', num2str(AUROC,'%1.3f')])
+xlabel('False positive rate')
+ylabel('True positive rate')
+movshonize(36,1)
+makeWhite
+
+%Can you relate the shape of this curve to the numeric metric?
+%Which of the 8 conditions maximizes it?
+
+%% Step 10: We note that the classes are rather imbalanced:
+%a stimulus came on most of the trials, and the animal moved most of the
+%trials
+%So perhaps it is better to plot a precision/recall curve
+%This can be easily achieved by adding some extra parameters to this
+%function
+
+[x, y, t, AUPRC] = perfcurve(Y, p, 1, 'XCrit', 'reca', 'YCrit', 'prec');
+
+figure
+plot(x,y,'color','k','LineWidth',3);
+title(['Area under the PR curve = ', num2str(AUPRC,'%1.3f')])
+xlabel('False positive rate')
+ylabel('True positive rate')
+movshonize(36,1)
+makeWhite
+
+%What do you notice regarding the relative shape of AUROC vs. AUPRC
+%scores and the associated integrals under the curves
+
+%% Step 11: Population activity counts are a rather crude metric 
+%Can we improve classification performance by using principal components
+%as predictors instead?
+
+%****************************************************************
+%*ACTION POTENTIAL: Pick corresponding condition (to step 7)                                              
+%****************************************************************
+
+spikes = spikesRegion2(:,:,1); %Pick the condition you want here
+
+%****************************************************************
+%*ACTION POTENTIAL: Make sure variables are equal variance and demeaned                                             
+%****************************************************************
+
+[loadings,oldDataInNewCoords,eigVals] = pca(zscore(spikes)); %Do the PCA
+
+%% Step 12: Using multiple predictors (first 2 PCA components) instead of 
+%  population activity with a support vector machines
+X = [oldDataInNewCoords(:,1) oldDataInNewCoords(:,2)]; %First 2 PCs
+[betas fitQuality stats] = glmfit(X,Y,"binomial", "link","logit") %This is logistic regression
+p = glmval(betas, X, 'logit');
+
+[x, y, t, AUPRC] = perfcurve(Y, p, 1, 'XCrit', 'reca', 'YCrit', 'prec');
+
+figure
+plot(x,y,'color','k','LineWidth',3);
+title(['Area under the curve = ', num2str(AUPRC,'%1.3f')])
+xlabel('False positive rate')
+ylabel('True positive rate')
+movshonize(36,1)
+makeWhite
+
+
+
+%%
+%****************************************************************
+%*ACTION POTENTIAL: Extra steps                                             
+%****************************************************************
+
+%This is a genuine action potential. You don't have to do this.
+%But if you see this code block, you have
+%reached the end of the tutorial. If there is still time left in the
+%session, we have the following suggestions on how to improve this analysis
+%(try it?):
+%1) The point of the exercise was to find out which of the combinations of
+%trial types, activity windows and brain areas yields the best "on vs. off"
+%classification performance. However, due to the fact that we are using all
+%of the data to estimate the coefficients *and* the model performance, we
+%are most certainly overfitting. This makes the absolute model performance
+%hard to interpret. In the interest of time (and because we don't have all
+%that much trial data), we didn't do a train/test split in the above (we
+%recommend a "leave one out" procedure given the data we have). 
+%Add that split to the code now (using a training set to estimate the model
+%coefficients and different data to assess model performance). 
+%What happens to AUC if you do that? Does it go up or down?
+%2) Adjust the window size in step 3. This is the window over which spiking
+%activity is integrated. Obviously, spike counts will go down if the window
+%is shorter and up if it is longer. But how is AUC affected? Is there an
+%optimal window (plot AUC as a function of window size)
+%3) In step 13, it would be nice to be able to *see* the support vector
+%machine, as visual interpretability is one of the great strengths of
+%support vector machines. Can you re-purpose the code from yesterday (file
+%m) to do so?
+
+
