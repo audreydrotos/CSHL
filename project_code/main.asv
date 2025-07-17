@@ -65,18 +65,21 @@ for rr = 1:2
     hold on
     xlabel('Firing rates (spikes/second)')
     ylabel('Counts')
-    title('Firing Rates in ',regions.name(region_code))
-
-    % subplot(2,2,rr+2)
-    % % preallocate mean array
-    % means = zeros(length(region_neurons));
-    % % Plot all neurons, mean of all trials
-    % for i = 1:sum(region_idx)
-    %    % average trial response
-    %    avg_resp = mean(region_neurons(i,:), 2);
-    %    plot(avg_resp)
-    %    hold on
-    % end
+    title(['Firing Rates in ',regions.name(region_code)])
+    
+    subplot(2,2,rr+2)
+    % preallocate mean array
+    means = zeros(length(region_neurons));
+    % Plot all neurons, mean of all trials
+    for i = 1:sum(region_idx)
+       % average trial response
+       avg_resp = mean(region_neurons(i,:,:), 3);
+       plot(avg_resp)
+       hold on
+    end
+    xlabel('Neuron')
+    ylabel('Average Trial Response')
+    hold off
 end
 
 %% Create PSTH and change into tensor format
@@ -123,15 +126,7 @@ for rr = 1:2
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
     region_neurons = binnedTensor(region_idx, :, :);
-    % preallocate mean array
-    means = zeros(length(region_neurons));
-    % Plot all neurons, mean of all trials
-    for i = 1:sum(region_idx)
-       % average trial response
-       avg_resp = mean(region_neurons(i,:,:), 3);
-       plot(avg_resp)
-       hold on
-    end
+    
     %% Generate PCA
     subplot(3,2,rr+2)
     % find
