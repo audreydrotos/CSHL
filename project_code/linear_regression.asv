@@ -5,13 +5,9 @@ load('binnedTensor.mat')
 leftStim = S.trials.visualStim_contrastLeft;
 rightStim = S.trials.visualStim_contrastRight;
 
-region_code = 3; % LGd
-region_idx = neurons.region == region_code;
-region_neurons = binnedTensor(region_idx, :, :);
-
 % predict the right contrast stimulus from the data
 % for each individual neuron
-nNeurons = size(region_neurons,1);
+nNeurons = size(binnedTensor,1);
 
 accuracy_matrix = zeros(1,nNeurons);
 accuracy_matrix_shuffled = zeros(1,nNeurons);
@@ -22,7 +18,7 @@ parfor i = 1:nNeurons
     y = rightStim;
 
     % which data to use
-    neuron_data = region_neurons(i,:,:);
+    neuron_data = binnedTensor(i,:,:);
     neuron_data = squeeze(neuron_data);
     neuron_data = neuron_data'; % flip so this is rows = trials and columns = binned spike times
     x = neuron_data;
@@ -76,12 +72,3 @@ xline(length(unique(rightStim)))
 %% predict neural activity based on behavioral data
 % from neural activity predict across TIME to see when prediction is
 % highest for the sound
-parfor i = 1:nNeurons
-    % what do we want to predict with SVM
-    y = rightStim;
-
-    % which data to use
-    neuron_data = region_neurons(i,:,:);
-    neuron_data = squeeze(neuron_data);
-    neuron_data = neuron_data'; % flip so this is rows = trials and columns = binned spike times
-    x = neuron_data;
