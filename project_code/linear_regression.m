@@ -73,9 +73,21 @@ hold on
 histogram(accuracy_matrix_shuffled)
 xline(length(unique(rightStim)))
 
-%% predict neural activity based on behavioral data
+%% predict right stimulus across each window of the binned spike data
 % from neural activity predict across TIME to see when prediction is
 % highest for the sound. predict once for every time window.
+
+% load tensor data and smooth it
+load('binnedTensor.mat')
+smoothedTensor = movmean(binnedTensor, [5 5], 2);
+stepSize = 10;
+idx = 1:stepSize:size(smoothedTensor,2);
+tensorPCA = smoothedTensor(:,idx,:);
+
+% subset for our neurons
+region_code = 3; % LGd
+region_idx = neurons.region == region_code;
+region_neurons = tensorPCA(region_idx, :, :);
 
 % what do we want to predict with SVM
 y = rightStim;
@@ -87,13 +99,13 @@ accuracy = [];
 cv = cvpartition(y,'KFold', 5);
 
 % perform decoding across time windows
-for w = 1:size(neuron_data,2)
-    x_window = squeeze(region_neurons(:,2,:));
+parfor w = 1:size(neuron_data,2)
+    x_window = squeeze(region_neurons(:,w,:));
     x = x_window';
 
     % initialize matrix
     acc = zeros(cv.NumTestSets,1);
-    
+
     % train and test the model
     for i = 1:cv.NumTestSets
         trainX = x(cv.training(i),:);
