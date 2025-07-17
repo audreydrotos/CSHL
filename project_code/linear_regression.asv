@@ -80,33 +80,33 @@ xline(length(unique(rightStim)))
 % what do we want to predict with SVM
 y = rightStim;
 
+% which data to use
+neuron_data = mean(region_neurons,);
+neuron_data = squeeze(neuron_data);
+neuron_data = neuron_data'; % flip so this is rows = trials and columns = binned spike times
+x = neuron_data;
+
 % initialize matrix
 accuracy = [];
 
 % 5 fold cross validation
-cv = cvpartition(y,'KFold', 5);
+cv = cvpartition(labels,'KFold', 5);
 
 % perform decoding across time windows
 for w = 1:size(neuron_data,2)
     x_window = squeeze(region_neurons(:,2,:));
     x = x_window';
 
-    % initialize matrix
     acc = zeros(cv.NumTestSets,1);
-    
-    % train and test the model
     for i = 1:cv.NumTestSets
-        trainX = x(cv.training(i),:);
-        testX = x(cv.test(i),:);
-        trainY = y(cv.training(i));
-        testY = y(cv.test(i));
+        trainX = X(cv.training(i),:);
+        testX = X(cv.test(i),:);
+        trainY = labels(cv.training(i));
+        testY = labels(cv.test(i));
 
         model = fitcecoc(trainX, trainY);
         pred = predict(model, testX);
         acc(i) = mean(pred == testY);
     end
-
     accuracy(w) = mean(acc) * 100;
 end
-
-plot(accuracy)

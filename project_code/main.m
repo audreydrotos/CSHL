@@ -96,6 +96,9 @@ for n = 1:nNeurons
    end
 end
 % Now have a neurons x PSTH x trials array
+
+% save the binned tensor
+save('binnedTensor.mat', 'binnedTensor')
 %% Plot traces relative to stim, response, and go
 % We already have two regions and we need to plot them together. Make it
 % parameters.
