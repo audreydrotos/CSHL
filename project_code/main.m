@@ -4,7 +4,7 @@
 addpath(genpath('..'))
 
 close all; clear; clc; rng(123);
-path2data = 'C:\cshl-neudata-2025\Steinmetz_raw\steinmetz_project\';
+path2data = 'steinmetz_selected_data/';
 %% pick a session
 sesPath = 'Moniz_2017-05-16'; % session with both motor and sensory areas
 %sesPath = 'Forssmann_2017-11-01'; % session with medial regions and HPC regions
@@ -68,18 +68,6 @@ for rr = 1:2
     xlabel('Firing rates (spikes/second)')
     ylabel('Counts')
     title('Firing Rates in Selected Regions')
-    
-
-    % subplot(2,2,rr+2)
-    % % preallocate mean array
-    % means = zeros(length(region_neurons));
-    % % Plot all neurons, mean of all trials
-    % for i = 1:sum(region_idx)
-    %    % average trial response
-    %    avg_resp = mean(region_neurons(i,:), 2);
-    %    plot(avg_resp)
-    %    hold on
-    % end
 end
 legend([regions.name(regionSelected)]);
 
@@ -88,11 +76,8 @@ legend([regions.name(regionSelected)]);
 binSize = 0.005;
 timeWindow = [-0.5 2];
 %change window here
-edges1 = timeWindow(1):binSize:timeWindow(2);
-% edges2 = binSize/2:binSize:timeWindow(2);
-
-% nBins = length(edges1)+length(edges2)-2;
-nBins = length(edges1)-1;
+edges = timeWindow(1):binSize:timeWindow(2);
+nBins = length(edges)-1;
 nTrials = length(stimTimes);
 nNeurons = length(spikeMatrix);
 % Preallocate output
@@ -106,16 +91,8 @@ for n = 1:nNeurons
        trialSpikes= neuronSpikes(neuronSpikes >=trialStart + timeWindow(1) & ...
            neuronSpikes < trialStart + timeWindow(2));
        alignedSpikes = trialSpikes - trialStart;
-       binnedCounts1 = histcounts(alignedSpikes, edges1);
-       % binnedCounts2 = histcounts(alignedSpikes, edges2);
-  
-       % total_counts = zeros(1,size(binnedCounts1,2)+size(binnedCounts2,2));
-       % interleaved counts
-       % total_counts(1:2:end) = binnedCounts1;
-       % total_counts(2:2:end) = binnedCounts2;
-
-       % binnedTensor(n,:,t) = total_counts;
-       binnedTensor(n,:,t) = binnedCounts1;
+       binnedCounts = histcounts(alignedSpikes, edges);
+       binnedTensor(n,:,t) = binnedCounts;
    end
 end
 % Now have a neurons x PSTH x trials array
@@ -128,9 +105,11 @@ end
 smoothedTensor = movmean(binnedTensor, [5 5], 2);
 means = [];
 
-figure()
+figure;
+t = tiledlayout(3, 2);  % 3行2列网格
+
 for rr = 1:2
-    subplot(3,2,rr)
+    nexttile(rr)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
     region_neurons = smoothedTensor(region_idx, :, :);
@@ -144,6 +123,9 @@ for rr = 1:2
        hold on
     end
     mean_resp = mean(means);
+    xlabel('Time bins')
+    ylabel('Response amplitude')
+    title(regions.name(regionSelected(rr)))
     plot(mean_resp, 'k', 'LineWidth', 3);
     hold off
 end
@@ -153,22 +135,22 @@ stepSize = 10;
 idx = 1:stepSize:size(smoothedTensor,2);
 
 tensorPCA = smoothedTensor(:,idx,:);
-
+%allScores = [];
 for rr = 1:2
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
     region_neurons = tensorPCA(region_idx, :, :);
 
     % Generate PCA
-    subplot(3,2,rr+2)
+    nexttile(rr+2)
 
     % find
     averageTrials = mean(region_neurons,3);
 
     % Run the PCA
-    [coefs, scores, ~, ~, explained ] = pca(averageTrials',"NumComponents",3);
+    [coefs, scores, ~, ~, explained ] = pca(averageTrials');
     cumulative_variance = cumsum(explained)/100;
-    K = find(cumulative_variance >= 0.80, 1); % 自动选择K
+    K = find(cumulative_variance >= 0.80, 1); % choose K
 
     %plot Scree-plot to decide K
     plot(1:length(explained), explained, 'bo-', 'LineWidth', 2);
@@ -177,11 +159,54 @@ for rr = 1:2
     title(['Scree Plot for PCA on',regions.name(regionSelected(rr))],[num2str(K),' component count for 80% variance']);
     xlim([0 10])
     grid on;
-
-    % plot coef by signals
-    subplot(3,2,rr+4)
-    plot3(scores(:,1), scores(:,2), scores(:,3));
+    %allScores(:,:,rr) = scores;
+    % separate pca; can't draw together
+    nexttile(rr+4)
+    plot3(scores(:,1), scores(:,2), scores(:,3),colorSelected(rr));
+    xlabel('PCA 1')
+    ylabel('PCA 2')
+    zlabel('PCA 3')
+    title('PCA on',regions.name(region_code))
+ 
 end
+% nexttile([1, 2]);
+% for rr = 1:2
+%     % plot coef by signals
+%     plot3(allScores(:,1,rr), allScores(:,2,rr), allScores(:,3,rr),colorSelected(rr));
+%     hold on
+% end
+% legend([regions.name(regionSelected)]);
+
+%% NMF
+% 
+%% Umap
+% Use 'run_umap' to reduce the dim to 3
+% try different values for n_neighbors ranging from 5 to 199
+figure;
+t = tiledlayout(1, 2); 
+
+for rr = 1:2
+    region_code = regionSelected(rr);
+    region_idx = neurons.region == region_code;
+    region_neurons = tensorPCA(region_idx, :, :);
+     % Generate UMAP
+    nexttile(rr)
+
+    % find
+    averageTrials = mean(region_neurons,3);
+    [rep_UMAP, umap, clusterIdentifiers, extras]=run_umap(double(averageTrials'), ...
+    'n_components', 3, 'n_neighbors', 5, 'verbose', 'none');
+    % plot coef by signals
+    plot3(rep_UMAP(:,1), rep_UMAP(:,2), rep_UMAP(:,3),colorSelected(rr));
+    xlabel('UMAP 1')
+    ylabel('UMAP 2')
+    zlabel('UMAP 3')
+    title('UMAP on',regions.name(region_code))
+    hold on
+
+end
+
+
 
 
 %% Find trials where each stimulus occurs
