@@ -1,7 +1,7 @@
 %% Explore various features (outcomes and behavior data) of a typical Steinmetz 2019 (2-probe) data set
 % This script also does some useful book-keeping and summarizing that you
 % may find useful in many later exercises
-path2data = 'steinmetz_selected_data/';
+path2data = 'C:\cshl-neudata-2025\Steinmetz_raw\steinmetz_project\';
 %% pick a session
 sesPath = 'Moniz_2017-05-16'; % session with both motor and sensory areas
 %sesPath = 'Forssmann_2017-11-01'; % session with medial regions and HPC regions
@@ -45,7 +45,6 @@ end
 %% Plot average firing rate as histogram
 figure()
 for rr = 1:2
-    subplot(2,2,rr)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
     region_neurons = spikeMatrix(region_idx);
@@ -65,7 +64,8 @@ for rr = 1:2
     hold on
     xlabel('Firing rates (spikes/second)')
     ylabel('Counts')
-    title('Firing Rates in ',regions.name(region_code))
+    title('Firing Rates in Selected Regions')
+    legend([regions.name(regionSelected)]);
 
     % subplot(2,2,rr+2)
     % % preallocate mean array
