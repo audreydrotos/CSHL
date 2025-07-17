@@ -1,6 +1,9 @@
 %% Explore various features (outcomes and behavior data) of a typical Steinmetz 2019 (2-probe) data set
 % This script also does some useful book-keeping and summarizing that you
 % may find useful in many later exercises
+addpath(genpath('..'))
+
+close all; clear; clc; rng(123);
 path2data = 'C:\cshl-neudata-2025\Steinmetz_raw\steinmetz_project\';
 %% pick a session
 sesPath = 'Moniz_2017-05-16'; % session with both motor and sensory areas
@@ -181,8 +184,27 @@ for rr = 1:2
 end
 
 
-%% Find trials where left stimulus only
-S.trials.VisualStim_contrastLeft
+%% Find trials where each stimulus occurs
+leftStim = S.trials.visualStim_contrastLeft;
+rightStim = S.trials.visualStim_contrastRight;
+
+% create stimtype var
+stimType = zeros(1,length(leftStim));
+
+% create vector that has left as 1 and 
+% right as 2
+% both as 3
+% none as 0
+for i = 1:length(leftStim)
+    if leftStim(i) > 0 && rightStim(i) > 0
+        stimType(i) = 3;
+    elseif leftStim(i) > 0 && rightStim(i) == 0
+        stimType(i) = 1;
+    elseif leftStim(i) == 0 && rightStim(i) > 0
+        stimType(i) = 2;
+    else stimType(i) = 0;
+    end
+end
 
 
-
+%% Plot PCA for each trial type
