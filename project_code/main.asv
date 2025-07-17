@@ -96,6 +96,9 @@ for n = 1:nNeurons
    end
 end
 % Now have a neurons x PSTH x trials array
+
+% save the binned tensor
+save('binnedTensor.mat', 'binnedTensor')
 %% Plot traces relative to stim, response, and go
 % We already have two regions and we need to plot them together. Make it
 % parameters.
@@ -107,10 +110,9 @@ means = [];
 
 figure;
 t = tiledlayout(3, 2);  % 3行2列网格
-figure_id = 1;
+
 for rr = 1:2
-    nexttile(figure_id)
-    figure_id = figure_id + 1;
+    nexttile(rr)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
     region_neurons = smoothedTensor(region_idx, :, :);
@@ -136,15 +138,14 @@ stepSize = 10;
 idx = 1:stepSize:size(smoothedTensor,2);
 
 tensorPCA = smoothedTensor(:,idx,:);
-allScores = [];
+%allScores = [];
 for rr = 1:2
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
     region_neurons = tensorPCA(region_idx, :, :);
 
     % Generate PCA
-    nexttile(figure_id)
-    figure_id = figure_id + 1;
+    nexttile(rr+2)
 
     % find
     averageTrials = mean(region_neurons,3);
@@ -152,7 +153,7 @@ for rr = 1:2
     % Run the PCA
     [coefs, scores, ~, ~, explained ] = pca(averageTrials');
     cumulative_variance = cumsum(explained)/100;
-    K = find(cumulative_variance >= 0.80, 1); % 自动选择K
+    K = find(cumulative_variance >= 0.80, 1); % choose K
 
     %plot Scree-plot to decide K
     plot(1:length(explained), explained, 'bo-', 'LineWidth', 2);
@@ -161,24 +162,86 @@ for rr = 1:2
     title(['Scree Plot for PCA on',regions.name(regionSelected(rr))],[num2str(K),' component count for 80% variance']);
     xlim([0 10])
     grid on;
-    allScores(:,:,rr) = scores;
+    %allScores(:,:,rr) = scores;
+    % separate pca; can't draw together
+    nexttile(rr+4)
+    plot3(scores(:,1), scores(:,2), scores(:,3),colorSelected(rr));
+    xlabel('PCA 1')
+    ylabel('PCA 2')
+    zlabel('PCA 3')
+    title('PCA on',regions.name(region_code))
  
 end
-nexttile([1, 2]);
-for rr = 1:2
-    % plot coef by signals
-    plot3(allScores(:,1,rr), allScores(:,2,rr), allScores(:,3,rr),colorSelected(rr));
-    hold on
-end
-legend([regions.name(regionSelected)]);
+% nexttile([1, 2]);
+% for rr = 1:2
+%     % plot coef by signals
+%     plot3(allScores(:,1,rr), allScores(:,2,rr), allScores(:,3,rr),colorSelected(rr));
+%     hold on
+% end
+% legend([regions.name(regionSelected)]);
 
 %% NMF
-% 
+nFactors = 5;
+figure;
+t = tiledlayout(1, 2); 
+
+for rr = 1:2
+    region_code = regionSelected(rr);
+    region_idx = neurons.region == region_code;
+    region_neurons = tensorPCA(region_idx, :, :);
+     % Generate NMF
+    nexttile(rr)
+
+    % find
+    averageTrials = mean(region_neurons,3);
+   
+    % this is the nmf
+    [W,H, disc] = nnmf(averageTrials, nFactors); % specify six factors
+
+    myNMFLoads{kk} = H';
+
+
+    % plot coef by signals
+    plot3(H'(:,1), H'(:,2), H'(:,3),'.');
+    xlabel('C 1'); ylabel('C 2'); zlabel('C 3');
+    title('NMF on',regions.name(region_code))
+    hold on
+
+end
+
+
+
+
+
+
 %% Umap
 % Use 'run_umap' to reduce the dim to 3
 % try different values for n_neighbors ranging from 5 to 199
-[rep_UMAP, umap, clusterIdentifiers, extras]=run_umap(double(averageTrials'), ...
-    'n_components', 3, 'n_neighbors', 5, 'verbose', 'none');
+n_components = 3;
+n_neighbors = 50;
+figure;
+t = tiledlayout(1, 2); 
+
+for rr = 1:2
+    region_code = regionSelected(rr);
+    region_idx = neurons.region == region_code;
+    region_neurons = tensorPCA(region_idx, :, :);
+     % Generate UMAP
+    nexttile(rr)
+
+    % find
+    averageTrials = mean(region_neurons,3);
+    [rep_UMAP, umap, clusterIdentifiers, extras]=run_umap(double(averageTrials'), ...
+    'n_components', n_components, 'n_neighbors', n_neighbors, 'verbose', 'none');
+    % plot coef by signals
+    plot3(rep_UMAP(:,1), rep_UMAP(:,2), rep_UMAP(:,3),colorSelected(rr));
+    xlabel('UMAP 1')
+    ylabel('UMAP 2')
+    zlabel('UMAP 3')
+    title('UMAP on',regions.name(region_code))
+    hold on
+
+end
 
 
 
