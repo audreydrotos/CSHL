@@ -181,10 +181,41 @@ end
 % legend([regions.name(regionSelected)]);
 
 %% NMF
-% 
+nFactors = 5;
+figure;
+t = tiledlayout(1, 2); 
+
+for rr = 1:2
+    region_code = regionSelected(rr);
+    region_idx = neurons.region == region_code;
+    region_neurons = tensorPCA(region_idx, :, :);
+     % Generate NMF
+    nexttile(rr)
+
+    % find
+    averageTrials = mean(region_neurons,3);
+   
+    % this is the nmf
+    [W,H, disc] = nnmf(averageTrials, nFactors); % specify six factors
+    myNMFLoads = H';
+    % plot coef by signals
+    plot3(myNMFLoads(:,1), myNMFLoads(:,2), myNMFLoads(:,3),colorSelected(rr));
+    xlabel('C 1'); ylabel('C 2'); zlabel('C 3');
+    title('NMF on',regions.name(region_code))
+    hold on
+
+end
+
+
+
+
+
+
 %% Umap
 % Use 'run_umap' to reduce the dim to 3
 % try different values for n_neighbors ranging from 5 to 199
+n_components = 3;
+n_neighbors = 50;
 figure;
 t = tiledlayout(1, 2); 
 
@@ -198,7 +229,7 @@ for rr = 1:2
     % find
     averageTrials = mean(region_neurons,3);
     [rep_UMAP, umap, clusterIdentifiers, extras]=run_umap(double(averageTrials'), ...
-    'n_components', 3, 'n_neighbors', 5, 'verbose', 'none');
+    'n_components', n_components, 'n_neighbors', n_neighbors, 'verbose', 'none');
     % plot coef by signals
     plot3(rep_UMAP(:,1), rep_UMAP(:,2), rep_UMAP(:,3),colorSelected(rr));
     xlabel('UMAP 1')
