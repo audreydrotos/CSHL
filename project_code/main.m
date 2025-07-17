@@ -49,7 +49,7 @@ for rr = 1:2
     region_idx = neurons.region == region_code;
     region_neurons = spikeMatrix(region_idx);
     % generate empty array
-    firingRates = zeros(1,length(region_neurons));
+    firingRates = zeros(1,length(region_neurons)); 
     % find average firing rate of each neuron in this cell array
     for i = 1:length(region_neurons)
        spikes = region_neurons{i};
@@ -65,7 +65,7 @@ for rr = 1:2
     xlabel('Firing rates (spikes/second)')
     ylabel('Counts')
     title('Firing Rates in Selected Regions')
-    legend([regions.name(regionSelected)]);
+    
 
     % subplot(2,2,rr+2)
     % % preallocate mean array
@@ -78,16 +78,18 @@ for rr = 1:2
     %    hold on
     % end
 end
+legend([regions.name(regionSelected)]);
 
 %% Create PSTH and change into tensor format
 % need neurons x time_bins x trials
 binSize = 0.005;
-timeWindow = [0 2];
+timeWindow = [-0.5 2];
 %change window here
 edges1 = timeWindow(1):binSize:timeWindow(2);
-edges2 = binSize/2:binSize:timeWindow(2);
+% edges2 = binSize/2:binSize:timeWindow(2);
 
-nBins = length(edges1)+length(edges2)-2;
+% nBins = length(edges1)+length(edges2)-2;
+nBins = length(edges1)-1;
 nTrials = length(stimTimes);
 nNeurons = length(spikeMatrix);
 % Preallocate output
@@ -102,14 +104,15 @@ for n = 1:nNeurons
            neuronSpikes < trialStart + timeWindow(2));
        alignedSpikes = trialSpikes - trialStart;
        binnedCounts1 = histcounts(alignedSpikes, edges1);
-       binnedCounts2 = histcounts(alignedSpikes, edges2);
+       % binnedCounts2 = histcounts(alignedSpikes, edges2);
   
-       total_counts = zeros(1,size(binnedCounts1,2)+size(binnedCounts2,2));
+       % total_counts = zeros(1,size(binnedCounts1,2)+size(binnedCounts2,2));
        % interleaved counts
-       total_counts(1:2:end) = binnedCounts1;
-       total_counts(2:2:end) = binnedCounts2;
+       % total_counts(1:2:end) = binnedCounts1;
+       % total_counts(2:2:end) = binnedCounts2;
 
-       binnedTensor(n,:,t) = total_counts;
+       % binnedTensor(n,:,t) = total_counts;
+       binnedTensor(n,:,t) = binnedCounts1;
    end
 end
 % Now have a neurons x PSTH x trials array
@@ -117,42 +120,69 @@ end
 % We already have two regions and we need to plot them together. Make it
 % parameters.
 % vars are stimTimes, respTimes, goTimes
-figure
+
+% Smooth across time
+smoothedTensor = movmean(binnedTensor, [5 5], 2);
+means = [];
+
+figure()
 for rr = 1:2
     subplot(3,2,rr)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
-    region_neurons = binnedTensor(region_idx, :, :);
-    % preallocate mean array
-    means = zeros(length(region_neurons));
+    region_neurons = smoothedTensor(region_idx, :, :);
+
     % Plot all neurons, mean of all trials
     for i = 1:sum(region_idx)
        % average trial response
        avg_resp = mean(region_neurons(i,:,:), 3);
        plot(avg_resp)
+       means(i,:) = avg_resp;
        hold on
     end
-    %% Generate PCA
+    mean_resp = mean(means);
+    plot(mean_resp, 'k', 'LineWidth', 3);
+    hold off
+end
+
+%% Reduce the values of trial for PCA
+stepSize = 10;
+idx = 1:stepSize:size(smoothedTensor,2);
+
+tensorPCA = smoothedTensor(:,idx,:);
+
+for rr = 1:2
+    region_code = regionSelected(rr);
+    region_idx = neurons.region == region_code;
+    region_neurons = tensorPCA(region_idx, :, :);
+
+    % Generate PCA
     subplot(3,2,rr+2)
+
     % find
     averageTrials = mean(region_neurons,3);
+
     % Run the PCA
     [coefs, scores, ~, ~, explained ] = pca(averageTrials',"NumComponents",3);
     cumulative_variance = cumsum(explained)/100;
     K = find(cumulative_variance >= 0.80, 1); % 自动选择K
+
     %plot Scree-plot to decide K
     plot(1:length(explained), explained, 'bo-', 'LineWidth', 2);
     xlabel('Principal Component');
     ylabel('Variance Explained (%)');
     title(['Scree Plot for PCA on',regions.name(regionSelected(rr))],[num2str(K),' component count for 80% variance']);
+    xlim([0 10])
     grid on;
+
     % plot coef by signals
     subplot(3,2,rr+4)
     plot3(scores(:,1), scores(:,2), scores(:,3));
 end
 
 
-
+%% Find trials where left stimulus only
+S.trials.VisualStim_contrastLeft
 
 
 
