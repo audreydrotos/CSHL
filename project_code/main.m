@@ -1,7 +1,7 @@
 %% Explore various features (outcomes and behavior data) of a typical Steinmetz 2019 (2-probe) data set
 % This script also does some useful book-keeping and summarizing that you
 % may find useful in many later exercises
-path2data = 'steinmetz_project/';
+path2data = 'steinmetz_selected_data/';
 %% pick a session
 sesPath = 'Moniz_2017-05-16'; % session with both motor and sensory areas
 %sesPath = 'Forssmann_2017-11-01'; % session with medial regions and HPC regions
