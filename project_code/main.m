@@ -12,6 +12,12 @@ sesPath = 'Moniz_2017-05-16'; % session with both motor and sensory areas
 %% Read in spike data .. ~5 sec
 % Note that regions are indexed 1 to regions.N but neurons are indexed Python-style from 0 to neurons.N-1
 [S, regions, neurons, trials] = stOpenSession([path2data,sesPath]);  % load .npy files in which data stored
+% save the binned tensor
+save(['postprocessed_data/' sesPath '_S.mat'], 'S')
+save(['postprocessed_data/' sesPath '_regions.mat'], 'regions')
+save(['postprocessed_data/' sesPath '_neurons.mat'], 'neurons')
+save(['postprocessed_data/' sesPath '_trials.mat'], 'trials')
+
 % note which regions: for Moniz LS on probe 0; DG, SUB & CA3 on probe 1 ; ACA & MOs on probe 0; VISam on probe 1
 regionTable = table( histcounts(neurons.region(neurons.probe==0),...
    .5:1:(regions.N-.5))', histcounts(neurons.region(neurons.probe==1),.5:1:(regions.N-.5))', ...
@@ -70,6 +76,7 @@ for rr = 1:2
     title('Firing Rates in Selected Regions')
 end
 legend([regions.name(regionSelected)]);
+saveas(gcf, ['figure/' sesPath '_firing rate.fig']);
 
 %% Create PSTH and change into tensor format
 % need neurons x time_bins x trials
@@ -98,7 +105,7 @@ end
 % Now have a neurons x PSTH x trials array
 
 % save the binned tensor
-save('binnedTensor.mat', 'binnedTensor')
+save(['postprocessed_data/' sesPath '_binnedTensor.mat'], 'binnedTensor')
 %% Plot traces relative to stim, response, and go
 % We already have two regions and we need to plot them together. Make it
 % parameters.
@@ -179,7 +186,7 @@ end
 %     hold on
 % end
 % legend([regions.name(regionSelected)]);
-
+saveas(gcf, ['figure/' sesPath '_pca.fig']);
 %% NMF
 nFactors = 5;
 figure;
@@ -206,7 +213,7 @@ for rr = 1:2
 
 end
 
-
+saveas(gcf, ['figure/' sesPath '_nmf.fig']);
 
 
 
@@ -215,7 +222,7 @@ end
 % Use 'run_umap' to reduce the dim to 3
 % try different values for n_neighbors ranging from 5 to 199
 n_components = 3;
-n_neighbors = 50;
+n_neighbors = 10;
 figure;
 t = tiledlayout(1, 2); 
 
@@ -240,7 +247,7 @@ for rr = 1:2
 
 end
 
-
+saveas(gcf, ['figure/' sesPath '_umap.fig']);
 
 
 %% Find trials where each stimulus occurs

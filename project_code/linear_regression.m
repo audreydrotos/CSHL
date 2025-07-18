@@ -1,6 +1,17 @@
 % load tensor data
-load('binnedTensor.mat')
+addpath(genpath('..'))
 
+close all; clear; clc; rng(123);
+%% pick a session
+sesPath = 'Moniz_2017-05-16';
+%sesPath = 'Forssmann_2017-11-01';
+%sesPath = 'Lederberg_2017-12-05'; 
+load(['postprocessed_data/' sesPath '_binnedTensor.mat'])
+load(['postprocessed_data/' sesPath '_S.mat'])
+load(['postprocessed_data/' sesPath '_regions.mat'])
+load(['postprocessed_data/' sesPath '_neurons.mat'])
+load(['postprocessed_data/' sesPath '_trials.mat'])
+ 
 %% fit linear regression model
 leftStim = S.trials.visualStim_contrastLeft;
 rightStim = S.trials.visualStim_contrastRight;
@@ -51,9 +62,9 @@ parfor i = 1:nNeurons
     yshuffled = y(randperm(length(y)))
 
     X_train = x(trainIdx, :);
-    y_train = shuffledy(trainIdx);
+    y_train = yshuffled(trainIdx);
     X_test = x(testIdx, :);
-    y_test = shuffledy(testIdx);
+    y_test = yshuffled(testIdx);
 
     % Train SVM model
     svmModel = fitcecoc(X_train, y_train); % fits SVM with default linear kernel, one v one
@@ -78,7 +89,7 @@ xline(length(unique(rightStim)))
 % highest for the sound. predict once for every time window.
 
 % load tensor data and smooth it
-load('binnedTensor.mat')
+load(['postprocessed_data/' sesPath '_binnedTensor.mat'])
 smoothedTensor = movmean(binnedTensor, [5 5], 2);
 stepSize = 10;
 idx = 1:stepSize:size(smoothedTensor,2);
