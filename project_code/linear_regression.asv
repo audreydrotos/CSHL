@@ -1,6 +1,17 @@
 % load tensor data
-load('binnedTensor.mat')
+addpath(genpath('..'))
 
+close all; clear; clc; rng(123);
+%% pick a session
+sesPath = 'Moniz_2017-05-16';
+%sesPath = 'Forssmann_2017-11-01';
+%sesPath = 'Lederberg_2017-12-05'; 
+load(['postprocessed_data/' sesPath '_binnedTensor.mat'])
+load(['postprocessed_data/' sesPath '_S.mat'])
+load(['postprocessed_data/' sesPath '_regions.mat'])
+load(['postprocessed_data/' sesPath '_neurons.mat'])
+load(['postprocessed_data/' sesPath '_trials.mat'])
+ 
 %% fit linear regression model
 leftStim = S.trials.visualStim_contrastLeft;
 rightStim = S.trials.visualStim_contrastRight;
@@ -51,9 +62,9 @@ parfor i = 1:nNeurons
     yshuffled = y(randperm(length(y)))
 
     X_train = x(trainIdx, :);
-    y_train = shuffledy(trainIdx);
+    y_train = yshuffled(trainIdx);
     X_test = x(testIdx, :);
-    y_test = shuffledy(testIdx);
+    y_test = yshuffled(testIdx);
 
     % Train SVM model
     svmModel = fitcecoc(X_train, y_train); % fits SVM with default linear kernel, one v one
@@ -73,40 +84,217 @@ hold on
 histogram(accuracy_matrix_shuffled)
 xline(length(unique(rightStim)))
 
-%% predict neural activity based on behavioral data
+
+%% predict right stimulus across each window of the binned spike data
 % from neural activity predict across TIME to see when prediction is
 % highest for the sound. predict once for every time window.
 
+% load tensor data and smooth it
+load(['postprocessed_data/' sesPath '_binnedTensor.mat'])
+smoothedTensor = movmean(binnedTensor, [5 5], 2);
+stepSize = 10;
+idx = 1:stepSize:size(smoothedTensor,2);
+tensorPCA = smoothedTensor(:,idx,:);
+
+% set up bins needed on X axis
+nBins = size(tensorPCA, 2);
+binnedTime = 2.5;
+msBin = binnedTime/nBins;
+time = -0.5:msBin:2;
+% bin tick every 50 bins (10 values)
+idx = 1:10:51;
+
+% subset for our neurons
+region_code = 10; % LGd
+region_idx = neurons.region == region_code;
+region_neurons = tensorPCA(region_idx, :, :);
+
 % what do we want to predict with SVM
 y = rightStim;
-
-% which data to use
-neuron_data = mean(region_neurons,);
-neuron_data = squeeze(neuron_data);
-neuron_data = neuron_data'; % flip so this is rows = trials and columns = binned spike times
-x = neuron_data;
 
 % initialize matrix
 accuracy = [];
 
 % 5 fold cross validation
-cv = cvpartition(labels,'KFold', 5);
+cv = cvpartition(y,'KFold', 5);
 
 % perform decoding across time windows
-for w = 1:size(neuron_data,2)
-    x_window = squeeze(region_neurons(:,2,:));
+parfor w = 1:size(region_neurons,2)
+    % go across each time window
+    x_window = squeeze(region_neurons(:,w,:));
     x = x_window';
 
+    % initialize matrix
     acc = zeros(cv.NumTestSets,1);
+
+    % train and test the model
     for i = 1:cv.NumTestSets
-        trainX = X(cv.training(i),:);
-        testX = X(cv.test(i),:);
-        trainY = labels(cv.training(i));
-        testY = labels(cv.test(i));
+        trainX = x(cv.training(i),:);
+        testX = x(cv.test(i),:);
+        trainY = y(cv.training(i));
+        testY = y(cv.test(i));
 
         model = fitcecoc(trainX, trainY);
         pred = predict(model, testX);
         acc(i) = mean(pred == testY);
     end
+
     accuracy(w) = mean(acc) * 100;
 end
+
+figure()
+subplot(2, 1, 1)
+plot(accuracy)
+hold on
+ylim([0 100])
+ylabel('Accuracy')
+xlabel('Time')
+title('Decoding Right Contrast from VIsp activity using SVM')
+hold off
+
+%% For LGD
+% subset for our neurons
+region_code = 3; % LGd
+region_idx = neurons.region == region_code;
+region_neurons = tensorPCA(region_idx, :, :);
+
+% what do we want to predict with SVM
+y = rightStim;
+
+% initialize matrix
+accuracy = [];
+
+% 5 fold cross validation
+cv = cvpartition(y,'KFold', 5);
+
+% perform decoding across time windows
+parfor w = 1:size(region_neurons,2)
+    % go across each time window
+    x_window = squeeze(region_neurons(:,w,:));
+    x = x_window';
+
+    % initialize matrix
+    acc = zeros(cv.NumTestSets,1);
+
+    % train and test the model
+    for i = 1:cv.NumTestSets
+        trainX = x(cv.training(i),:);
+        testX = x(cv.test(i),:);
+        trainY = y(cv.training(i));
+        testY = y(cv.test(i));
+
+        model = fitcecoc(trainX, trainY);
+        pred = predict(model, testX);
+        acc(i) = mean(pred == testY);
+    end
+
+    accuracy(w) = mean(acc) * 100;
+end
+
+subplot(2, 1, 2)
+plot(accuracy)
+hold on
+ylim([0 100])
+ylabel('Accuracy')
+xlabel('Time')
+title('Decoding Right Contrast from LGD activity using SVM')
+savefig('Moniz_2017-05-16_SVM_decoding_contrast')
+hold off
+
+%% Decode behavioral choice
+% subset for our neurons
+region_code = 10; % LGd
+region_idx = neurons.region == region_code;
+region_neurons = tensorPCA(region_idx, :, :);
+
+% what do we want to predict with SVM
+y = trials.Correct;
+
+% initialize matrix
+accuracy = [];
+
+% 5 fold cross validation
+cv = cvpartition(y,'KFold', 5);
+
+% perform decoding across time windows
+parfor w = 1:size(region_neurons,2)
+    % go across each time window
+    x_window = squeeze(region_neurons(:,w,:));
+    x = x_window';
+
+    % initialize matrix
+    acc = zeros(cv.NumTestSets,1);
+
+    % train and test the model
+    for i = 1:cv.NumTestSets
+        trainX = x(cv.training(i),:);
+        testX = x(cv.test(i),:);
+        trainY = y(cv.training(i));
+        testY = y(cv.test(i));
+
+        model = fitcecoc(trainX, trainY);
+        pred = predict(model, testX);
+        acc(i) = mean(pred == testY);
+    end
+
+    accuracy(w) = mean(acc) * 100;
+end
+
+figure()
+subplot(2, 1, 1)
+plot(accuracy)
+hold on
+ylim([0 100])
+ylabel('Accuracy')
+xlabel('Time')
+title('Decoding Correct Choice from VIsp activity using SVM')
+hold off
+
+%% Choice Decoding LGD
+% subset for our neurons
+region_code = 3; % LGd
+region_idx = neurons.region == region_code;
+region_neurons = tensorPCA(region_idx, :, :);
+
+% what do we want to predict with SVM
+y = trials.Correct;
+
+% initialize matrix
+accuracy = [];
+
+% 5 fold cross validation
+cv = cvpartition(y,'KFold', 5);
+
+% perform decoding across time windows
+parfor w = 1:size(region_neurons,2)
+    % go across each time window
+    x_window = squeeze(region_neurons(:,w,:));
+    x = x_window';
+
+    % initialize matrix
+    acc = zeros(cv.NumTestSets,1);
+
+    % train and test the model
+    for i = 1:cv.NumTestSets
+        trainX = x(cv.training(i),:);
+        testX = x(cv.test(i),:);
+        trainY = y(cv.training(i));
+        testY = y(cv.test(i));
+
+        model = fitcecoc(trainX, trainY);
+        pred = predict(model, testX);
+        acc(i) = mean(pred == testY);
+    end
+
+    accuracy(w) = mean(acc) * 100;
+end
+
+subplot(2, 1, 2)
+plot(accuracy)
+hold on
+ylim([0 100])
+ylabel('Accuracy')
+xlabel('Time')
+title('Decoding Correct Choice from LGD activity using SVM')
+savefig('Moniz_2017-05-16_SVM_decoding_correctchoice')
+hold off
