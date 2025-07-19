@@ -10,8 +10,8 @@ close all; clear; clc; rng(123);
 path2data = 'steinmetz_selected_data/';
 %% pick a session
 sesPath = 'Moniz_2017-05-16'; % session with both motor and sensory areas
-%sesPath = 'Forssmann_2017-11-01'; % session with medial regions and HPC regions
-%sesPath = 'Lederberg_2017-12-05'; % sessions with motor, sensory and caudate putamen
+% sesPath = 'Forssmann_2017-11-01'; % session with medial regions and HPC regions
+% sesPath = 'Lederberg_2017-12-05'; % sessions with motor, sensory and caudate putamen
 %% Read in spike data .. ~5 sec
 % Note that regions are indexed 1 to regions.N but neurons are indexed Python-style from 0 to neurons.N-1
 [S, regions, neurons, trials] = stOpenSession([path2data,sesPath]);  % load .npy files in which data stored

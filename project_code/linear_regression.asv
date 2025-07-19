@@ -160,5 +160,3 @@ for i = 1:nNeurons
     mdl = fitglm(X, Y);
 
 end
-
-

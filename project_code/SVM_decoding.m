@@ -95,6 +95,7 @@ stepSize = 10;
 idx = 1:stepSize:size(smoothedTensor,2);
 tensorPCA = smoothedTensor(:,idx,:);
 
+%%
 % set up bins needed on X axis
 nBins = size(tensorPCA, 2);
 binnedTime = 2.5;
@@ -105,20 +106,15 @@ idx = 1:10:51;
 time_xaxis = time(idx);
 
 % regions
-regions = [3 10];
-
-% subset for our neurons
-region_code = 10; % LGd
-region_idx = neurons.region == region_code;
-region_neurons = tensorPCA(region_idx, :, :);
+regions = [3 10 8];
 
 % 5 fold cross validation
 cv = cvpartition(y,'KFold', 5);
 
 % What do we want to decode? 
-y = rightStim;
+% y = rightStim;
 % y = trials.Correct;
-% y = trials.Correct;
+y = S.trials.response_choice;
 
 % initialize accuracy
 accuracy = zeros(size(region_neurons,2), length(region_code));
@@ -137,7 +133,9 @@ for r = 1:length(regions)
     
         % initialize matrix
         acc = zeros(cv.NumTestSets,1);
-    
+        allScores = [];
+        allLabels = [];
+
         % train and test the model
         for i = 1:cv.NumTestSets
             trainX = x(cv.training(i),:);
@@ -146,24 +144,41 @@ for r = 1:length(regions)
             testY = y(cv.test(i));
     
             model = fitcecoc(trainX, trainY);
-            pred = predict(model, testX);
+            [pred, score] = predict(model, testX);
             acc(i) = mean(pred == testY);
         end
-    
         accuracy(w,r) = mean(acc) * 100;
     end
 end
 
-figure()
-subplot(2, 1, 1)
+figure('Position', [0 0 300 800])
+subplot(3, 1, 1)
 plot(accuracy(:,1))
 hold on
-plot(accuracy(:,2))
-legend('LGD', 'VIsp')
 ylim([0 100])
 ylabel('Accuracy')
 xlabel('Time relative to Stim. Onset')
 xticks(idx)
 xticklabels(time_xaxis)
-title({'Decoding Right Contrast', 'from VIsp activity using SVM'})
+title({'Decoding Actual Choice', 'from LGD activity using SVM'})
 hold off
+
+subplot(3, 1, 2)
+plot(accuracy(:,2))
+title({'Decoding Actual Choice', 'from VIsp activity using SVM'})
+ylabel('Accuracy')
+xlabel('Time relative to Stim. Onset')
+xticks(idx)
+ylim([0 100])
+xticklabels(time_xaxis)
+
+subplot(3, 1, 3)
+plot(accuracy(:,3))
+title({'Decoding Actual Choice', 'from TH activity using SVM'})
+ylabel('Accuracy')
+xlabel('Time relative to Stim. Onset')
+xticks(idx)
+ylim([0 100])
+xticklabels(time_xaxis)
+
+savefig('actual_choice_decoding.fig')

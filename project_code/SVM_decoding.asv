@@ -95,6 +95,7 @@ stepSize = 10;
 idx = 1:stepSize:size(smoothedTensor,2);
 tensorPCA = smoothedTensor(:,idx,:);
 
+%%
 % set up bins needed on X axis
 nBins = size(tensorPCA, 2);
 binnedTime = 2.5;
@@ -137,7 +138,9 @@ for r = 1:length(regions)
     
         % initialize matrix
         acc = zeros(cv.NumTestSets,1);
-    
+        allScores = [];
+        allLabels = [];
+
         % train and test the model
         for i = 1:cv.NumTestSets
             trainX = x(cv.training(i),:);
@@ -146,16 +149,14 @@ for r = 1:length(regions)
             testY = y(cv.test(i));
     
             model = fitcecoc(trainX, trainY);
-            pred = predict(model, testX);
+            [pred, score] = predict(model, testX);
             acc(i) = mean(pred == testY);
         end
-    
         accuracy(w,r) = mean(acc) * 100;
     end
 end
 
 figure()
-subplot(2, 1, 1)
 plot(accuracy(:,1))
 hold on
 plot(accuracy(:,2))
