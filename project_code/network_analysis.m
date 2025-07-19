@@ -51,6 +51,18 @@ for i = 1:nNeurons
     concatPSTH(i,:) = binnedCounts;
 end
 
+%% First try to do the analysis this way--correlating individual cells
+% across the dataset
+C = corr(concatPSTH');
+figure;imagesc(C);
+hold on
+xlabel('cells')
+ylabel('cells')
+hold off
+savefig('Moniz_2017-05-16_correlations_bycell.fig')
+plotUndirectedCentralityCells(C, codeLabels);
+savefig('Moniz_2017-05-16_netework_analysis_bycell.fig')
+
 %% now concat PSTH is in neurons x time bins
 % however, we need to reduce each region to the first PC and use this as
 % the analysis
@@ -77,7 +89,9 @@ codeLabels = num2cell(1:size(scores_matrix,1));
 C = corr(scores_matrix');
 % plot correlation matrix
 figure;imagesc(C); setXLabels(codeLabels);
-plotUndirectedCentrality(C, codeLabels);
+regions = regions.name;
+plotUndirectedCentrality(C, codeLabels, regions);
+savefig('Moniz_2017-05-16_netework_analysis.fig')
 
 %% Step 1: load meta data
 %% Step 3: undirected graphs

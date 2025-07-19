@@ -45,50 +45,51 @@ concatPSTH = zeros(nNeurons, length(psthBins)-1);
 
 for i = 1:nNeurons
     % first need to bin the PSTH
-    spikes = spikeMatrix(1);
+    spikes = spikeMatrix(i);
     spikes = cell2mat(spikes);
     binnedCounts = histcounts(spikes, psthBins);
     concatPSTH(i,:) = binnedCounts;
 end
 
+%% First try to do the analysis this way--correlating individual cells
+% across the dataset
+C = corr(concatPSTH');
+figure;imagesc(C); setXLabels(codeLabels);
+regions = regions.name;
+plotUndirectedCentrality(C, codeLabels, regions);
+savefig('Moniz_2017-05-16_netework_analysis_bycell.fig')
+
 %% now concat PSTH is in neurons x time bins
 % however, we need to reduce each region to the first PC and use this as
 % the analysis
 unique_regions = unique(neurons.region);
-for n = 1 % unique_regions
+
+% preallocate scores matrix
+scores_matrix = zeros(length(unique_regions), size(concatPSTH, 2));
+for n = 1:length(unique_regions)
     region = unique_regions(n);
     % pull out all the matching cells
     idx = neurons.region == region;
     region_neurons = concatPSTH(idx,:);
     % perform PCA
-    [coefs, scores, ~, ~, explained ] = pca(region_neurons, 'NumComponents', 1);
+    [coefs, scores, ~, ~, explained ] = pca(region_neurons', 'NumComponents', 1);
+    % add to matrix
+    scores_matrix(n, :) = scores;
 end
-
 
 % what is the form of the data needed for this?
 % data is cells x time trials
-
-%% Step -1: fake data
+codeLabels = num2cell(1:size(scores_matrix,1));
+%% Plot the real correlation
 % data is cells over time, compute correlations 
-C = corr(concatPSTH');
+C = corr(scores_matrix');
 % plot correlation matrix
 figure;imagesc(C); setXLabels(codeLabels);
-plotUndirectedCentrality(C, codeLabels);
+regions = regions.name;
+plotUndirectedCentrality(C, codeLabels, regions);
+savefig('Moniz_2017-05-16_netework_analysis.fig')
 
-%% Step 0: set path to data files
-path2data = '../../data/Zebrafish/';
-[dat, data] = zbLoadOneFish(path2data, 'subject_1');
-dat = dat'; % dat is cells over time
 %% Step 1: load meta data
-trialLen = 30; % this is true for subject 1
-% load code labels
-[cellAnatCode, codeNums, codeLabels] = zbMakeAnatomicIndex(path2data, data);
-%% Step 2: get the pca of all brain regions 
-for brain_area_i = 1:length(codeLabels)
-    disp(brain_area_i);
-    x = double(dat(cellAnatCode == codeNums(brain_area_i), :));
-    [~, x_pca{brain_area_i}, ev_x{brain_area_i}] = pca(x');
-end
 %% Step 3: undirected graphs
 %% Step 3a: correlate 1PC across brain regions 
 for brain_area_src = 1:length(codeLabels)

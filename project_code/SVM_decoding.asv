@@ -194,6 +194,7 @@ parfor w = 1:size(region_neurons,2)
     accuracy(w) = mean(acc) * 100;
 end
 
+
 subplot(2, 1, 2)
 plot(accuracy)
 hold on
