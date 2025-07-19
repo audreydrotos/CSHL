@@ -86,17 +86,79 @@ legend({'X','Y','D','Stim'})
 xlim([ T1 T2]); xlabel('Time (sec)'); % can expand 
 hold off % often some glitches (abrupt displacement and return in a few frames)
 
+%% plot the average firing rates in LGd and VIsp
+% Put all spikes into a cell array
+clusters = unique(S.spikes.clusters);
+spikeMatrix = cell(length(clusters), 1); 
+
+for i = 1:length(clusters)
+    cluster = clusters(i);
+    idx = S.spikes.clusters == cluster;
+    neuronSpikes = S.spikes.times(idx);
+    spikeMatrix{i} = neuronSpikes; 
+end
+
+% Spike matrix now has all of the cells, need to subset by region
+region_code = 3; % for LGD or 10 for VIsp
+
+region_idx = neurons.region == region_code;
+region_neurons = spikeMatrix(region_idx);
+
 %% What behavioral correlates do we want to use for the GLM?
 % First we need to put everything on the same clock, use the lowest HZ
 % sampling rate?
 
+% need neurons x time_bins x trials
+binSize = 0.010;
+timeWindow = [0 sessionTime];
+
+%change window here
+psthBins = timeWindow(1):binSize:timeWindow(2);
+nBins = length(edges)-1;
+psthCenters = psthBins(1:end-1) + diff(psthBins)/2;
+
+% these are our X values
 % face energy
-S.face.motionEnergy;
-S.face.timestamps;
+nSamples = length(S.face.motionEnergy);
+energyTimes = linspace(S.face.timestamps(1,2), S.face.timestamps(2,2), nSamples);
+binnedFaceEnergy = interp1(energyTimes, S.face.motionEnergy, psthCenters, 'linear', 'extrap'); % interpolate
 
 % eye energy
-S.eye.area;
-S.eye.timestamps;
+nSamples = length(S.eye.area);
+eyeTimes = linspace(S.eye.timestamps(1,2), S.face.timestamps(2,2), nSamples);
+binnedEyeEnergy = interp1(eyeTimes, S.eye.area, psthCenters, 'linear', 'extrap');
 
-% contrast
-S
+% visual inputs
+S.trials.contrast;
+stimTimes;
+
+% licks
+S.licks.times;
+
+% this is our Y value--spike times, and then we will predict for every
+% neuron separately. right now this is in region_neurons. will need to
+% generate a PSTH live.
+nNeurons = length(region_neurons);
+
+%% for the PSTH
+% create empty array to put together all the variables
+B_array = zeros(1, nNeurons);
+dev_array = zeros(1, nNeurons);
+stats_array = [];
+
+for i = 1:nNeurons
+    % first need to bin the PSTH
+    spikes = region_neurons(1);
+    spikes = cell2mat(spikes);
+    binnedCounts = histcounts(spikes, edges);
+    Y = binnedCounts;
+
+    % concat all predictors
+    X = [binnedEyeEnergy', binnedFaceEnergy'];
+
+    % fit the GLM
+    mdl = fitglm(X, Y);
+
+end
+
+
