@@ -30,18 +30,18 @@ for i = 1:length(clusters)
 end
 
 % need neurons x time_bins and the stack all the trials
-binSize = 0.005;
+binSize = 0.010;
 timeWindow = [0 sessionTime];
 
 %change window here
 psthBins = timeWindow(1):binSize:timeWindow(2);
-nBins = length(edges)-1;
+nBins = length(psthBins)-1;
 psthCenters = psthBins(1:end-1) + diff(psthBins)/2;
 
 nNeurons = size(spikeMatrix,1);
 
 % concat PSTH
-concatPSTH = zeros(nNeurons, length(psthBins));
+concatPSTH = zeros(nNeurons, length(psthBins)-1);
 
 for i = 1:nNeurons
     % first need to bin the PSTH
@@ -51,13 +51,26 @@ for i = 1:nNeurons
     concatPSTH(i,:) = binnedCounts;
 end
 
-% form of the data
+%% now concat PSTH is in neurons x time bins
+% however, we need to reduce each region to the first PC and use this as
+% the analysis
+unique_regions = unique(neurons.region);
+for n = 1 % unique_regions
+    region = unique_regions(n);
+    % pull out all the matching cells
+    idx = neurons.region == region;
+    region_neurons = concatPSTH(idx,:);
+    % perform PCA
+    [coefs, scores, ~, ~, explained ] = pca(region_neurons, 'NumComponents', 1);
+end
+
+
+% what is the form of the data needed for this?
 % data is cells x time trials
-% code labels is a cell array with the numbers 1-80
+
 %% Step -1: fake data
-[data, codeLabels] = gen_fata;
 % data is cells over time, compute correlations 
-C = corr(data');
+C = corr(concatPSTH');
 % plot correlation matrix
 figure;imagesc(C); setXLabels(codeLabels);
 plotUndirectedCentrality(C, codeLabels);
