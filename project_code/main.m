@@ -120,9 +120,9 @@ for rr = 1:2
     region_idx = neurons.region == region_code;
     region_neurons = binnedTensor(region_idx, :, :);
 
-    summedTensor = sum(binnedTensor,2);
+    summedTensor = sum(region_neurons,2);
     neuronNum = size(region_neurons,1);
-
+    
     firing_Onbehavior = zeros(valueNum,neuronNum);
     time_Onbehavior = zeros(valueNum,neuronNum);
 
@@ -136,6 +136,7 @@ for rr = 1:2
             end
         end
     end
+
     firingRate_Onbehavior = firing_Onbehavior./time_Onbehavior;
     [peak_values, peak_stimuli] = max(firingRate_Onbehavior, [], 1);
     neuron_groups = cell(valueNum, 1);
@@ -145,18 +146,38 @@ for rr = 1:2
         %subplot(valueNum,2,rr+(stim-1)*2)
         subplot(2,valueNum,stim+(rr-1)*valueNum)
         neuron_groups{stim} = find(peak_stimuli == stim);
-        plot(behavior_value,firingRate_Onbehavior(:,neuron_groups{stim}));
-        hold on
-        %add mean line
-        meanRate = mean(firingRate_Onbehavior(:,neuron_groups{stim}),2); 
-        plot(behavior_value,meanRate, 'k', 'LineWidth', 3);
-        hold on
-        xticks(behavior_value);
-        title(['neuronum = ',num2str(size(firingRate_Onbehavior(:,neuron_groups{stim}),2))])
+        p = 1;
+        % check if the length is same
+        if (~isempty(neuron_groups{stim}))
+            plot(behavior_value,firingRate_Onbehavior(:,neuron_groups{stim}));
+            hold on
+            %add mean line
+            meanRate = mean(firingRate_Onbehavior(:,neuron_groups{stim}),2); 
+            plot(behavior_value,meanRate, 'k', 'LineWidth', 3);
+            %Shapiro-Wilk Test 
+            [h, p, W] = swtest(meanRate); 
+            %fprintf('Shapiro-Wilk Test: W = %.3f, p = %.3f\n', W, p);
+         %    if (p<0.05)
+         %        text(0, 0.4, '*', ...
+         % 'FontSize', 12, 'Color', 'red', 'BackgroundColor', 'white', ...
+         % 'EdgeColor', 'black', 'HorizontalAlignment', 'center');
+         %    end
+        %     text(0, 0.4, sprintf('SW Test: p = %.3f', W, p), ...
+        % 'FontSize', 12, 'Color', 'red', 'BackgroundColor', 'white', ...
+        % 'EdgeColor', 'black', 'HorizontalAlignment', 'center');
+            hold on
+            xticks(behavior_value);
+        end
+        if p<0.05
+            title(['neuronum = ',num2str(size(firingRate_Onbehavior(:,neuron_groups{stim}),2)),' *'])
+        else
+            title(['neuronum = ',num2str(size(firingRate_Onbehavior(:,neuron_groups{stim}),2))])
+        end
+
     end    
     xlabel(regions.name(region_code))
 end
-
+saveas(gcf, ['figure/' sesPath '_tuning curve.fig']);
 %% Plot traces relative to stim, response, and go
 % We already have two regions and we need to plot them together. Make it
 % parameters.
