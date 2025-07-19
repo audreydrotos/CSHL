@@ -23,7 +23,7 @@ regionTable = table( histcounts(neurons.region(neurons.probe==0),...
    .5:1:(regions.N-.5))', histcounts(neurons.region(neurons.probe==1),.5:1:(regions.N-.5))', ...
    'VariableNames',["Probe 0" "Probe 1"],'RowNames', regions.name(1:regions.N-1));
 %We select LGd(3) and VISp(10)
-regionSelected = [3,10];
+regionSelected = [3,10,8];
 colorSelected = ['r','b'];
 %disp(regionTable) % print out region names
 % fprintf('\nProbe 0 region counts: %d %d %d %d %d %d %d %d %d',histcounts(neurons.region(neurons.probe==0),.5:1:(regions.N-.5)))
@@ -113,9 +113,8 @@ behavior = trials.contrast;%can change it
 behavior_value = unique(behavior);
 valueNum = length(behavior_value);
 
-figure
-title('Tuning curve on ','turn')
-for rr = 1:2
+figure(1);
+for rr = 1:length(regionSelected)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
     region_neurons = binnedTensor(region_idx, :, :);
@@ -139,33 +138,56 @@ for rr = 1:2
 
     firingRate_Onbehavior = firing_Onbehavior./time_Onbehavior;
     [peak_values, peak_stimuli] = max(firingRate_Onbehavior, [], 1);
+
     neuron_groups = cell(valueNum, 1);
+    firingRate_maxnormalized = zeros(size(firingRate_Onbehavior));
+    for i = 1:size(firingRate_Onbehavior,2)
+        firingRate_maxnormalized(:,i) =  firingRate_Onbehavior(:,i)/max(firingRate_Onbehavior(:,i));
+    end
+
+    %sort the neuron by peak stimuli
+    [sortedArray, idx] = sort(peak_stimuli);
+    firingRate_maxnormalized_sorted = firingRate_maxnormalized(:,idx);
+    newfigure  = figure;
+    imagesc(firingRate_maxnormalized_sorted')
+    %colorbar;  
+    cb = colorbar;
+    cb.Label.String = 'Normalized firing rate';  % 设置标签文本
+    cb.Label.FontSize = 12;         % 调整字体大小[5,7](@ref)
+    % 获取当前坐标轴
+    ax = gca;
+    
+    set(ax, 'XTickLabel', compose('%.2f', behavior_value)); 
+    xlabel('Visual contrast')
+    ylabel('Sorted neurons')
+    title(regions.name(region_code))
+    
+    saveas(newfigure, sprintf('figure/%s_tuning heatmap_%s.png', sesPath, regions.name(region_code)));
+    %saveas(newfigure,'test.fig');
+    close(newfigure);
+
+    %ylabel(regions.name(region_code))
     
     % Group neurons by their peak stimulus
     for stim = 1:valueNum
         %subplot(valueNum,2,rr+(stim-1)*2)
-        subplot(2,valueNum,stim+(rr-1)*valueNum)
+        subplot(length(regionSelected),valueNum,stim+(rr-1)*valueNum)
         neuron_groups{stim} = find(peak_stimuli == stim);
         p = 1;
         % check if the length is same
         if (~isempty(neuron_groups{stim}))
-            plot(behavior_value,firingRate_Onbehavior(:,neuron_groups{stim}));
+            %add a normalization by divide by their minimum
+            %firingRate_normalized = normalize(firingRate_Onbehavior(:,neuron_groups{stim}), 'range');
+            firingRate_normalized = firingRate_Onbehavior(:,neuron_groups{stim});
+            
+            plot(behavior_value,firingRate_normalized);
+            %imagesc(firingRate_Onbehavior)
             hold on
             %add mean line
-            meanRate = mean(firingRate_Onbehavior(:,neuron_groups{stim}),2); 
+            meanRate = mean(firingRate_normalized,2); 
             plot(behavior_value,meanRate, 'k', 'LineWidth', 3);
             %Shapiro-Wilk Test 
             [h, p, W] = swtest(meanRate); 
-            %fprintf('Shapiro-Wilk Test: W = %.3f, p = %.3f\n', W, p);
-         %    if (p<0.05)
-         %        text(0, 0.4, '*', ...
-         % 'FontSize', 12, 'Color', 'red', 'BackgroundColor', 'white', ...
-         % 'EdgeColor', 'black', 'HorizontalAlignment', 'center');
-         %    end
-        %     text(0, 0.4, sprintf('SW Test: p = %.3f', W, p), ...
-        % 'FontSize', 12, 'Color', 'red', 'BackgroundColor', 'white', ...
-        % 'EdgeColor', 'black', 'HorizontalAlignment', 'center');
-            hold on
             xticks(behavior_value);
         end
         if p<0.05
@@ -173,11 +195,26 @@ for rr = 1:2
         else
             title(['neuronum = ',num2str(size(firingRate_Onbehavior(:,neuron_groups{stim}),2))])
         end
-
+        ylabel('Normalized firing rate')
+        xlabel('Visual contrast')
+        hold off
+    
     end    
-    xlabel(regions.name(region_code))
+    %xlabel(regions.name(region_code))
+    annotation('textbox', [0.85, 0.95 - (rr-1)*1/length(regionSelected), 0.2, 0.05], ...
+              'String', regions.name(region_code), 'EdgeColor', 'none', ...
+              'HorizontalAlignment', 'center', 'FontSize', 12);
+
 end
-saveas(gcf, ['figure/' sesPath '_tuning curve.fig']);
+% normalize the tuning curve
+%saveas(gcf, ['figure/' sesPath '_tuning curve_normalized.fig']);
+saveas(gcf, ['figure/' sesPath '_tuning curve_original.fig']);
+
+
+
+
+
+
 %% Plot traces relative to stim, response, and go
 % We already have two regions and we need to plot them together. Make it
 % parameters.
