@@ -24,7 +24,7 @@ regionTable = table( histcounts(neurons.region(neurons.probe==0),...
    'VariableNames',["Probe 0" "Probe 1"],'RowNames', regions.name(1:regions.N-1));
 %We select LGd(3) and VISp(10)
 regionSelected = [3,10,8];
-colorSelected = ['r','b'];
+colorSelected = ['r','b','g'];
 %disp(regionTable) % print out region names
 % fprintf('\nProbe 0 region counts: %d %d %d %d %d %d %d %d %d',histcounts(neurons.region(neurons.probe==0),.5:1:(regions.N-.5)))
 % fprintf('\nProbe 1 region counts: %d %d %d %d %d %d %d %d %d',histcounts(neurons.region(neurons.probe==1),.5:1:(regions.N-.5)))
@@ -53,7 +53,7 @@ end
 
 %% Plot average firing rate as histogram
 figure()
-for rr = 1:2
+for rr = 1:length(regionSelected)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
     region_neurons = spikeMatrix(region_idx);
@@ -212,9 +212,6 @@ saveas(gcf, ['figure/' sesPath '_tuning curve_original.fig']);
 
 
 
-
-
-
 %% Plot traces relative to stim, response, and go
 % We already have two regions and we need to plot them together. Make it
 % parameters.
@@ -225,9 +222,9 @@ smoothedTensor = movmean(binnedTensor, [5 5], 2);
 means = [];
 
 figure;
-t = tiledlayout(3, 2);  % 3行2列网格
+t = tiledlayout(3, 1);  % 3行2列网格
 
-for rr = 1:2
+for rr = 1:length(regionSelected)
     nexttile(rr)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
@@ -242,32 +239,50 @@ for rr = 1:2
        hold on
     end
     mean_resp = mean(means);
-    xlabel('Time bins')
-    ylabel('Response amplitude')
+
+    xlabel('Time')
+    ax = gca;   
+    set(ax, 'XTickLabel', compose('%.2f', [-0.5:0.25:2])); 
+
+    ylabel('Spike count per bin')
     title(regions.name(regionSelected(rr)))
     plot(mean_resp, 'k', 'LineWidth', 3);
     hold off
 end
 
 %% Reduce the values of trial for PCA
-stepSize = 10;
-idx = 1:stepSize:size(smoothedTensor,2);
+% stepSize = 10;
+% idx = 1:stepSize:size(smoothedTensor,2);
+% plot the behavior with color
+stepSize = 100;
+windowSize  = 50;
+temp = permute(binnedTensor, [1, 3, 2]); % 维度顺序变为a×c×b
+tensorPCA = reshape(temp, size(temp,1), size(temp,2)*size(temp,3)); % 按a行、b*c列展开
+reduced_data= zeros(size(tensorPCA,1),length(tensorPCA)/stepSize);
+% 滑动窗口求和
+for n = 1:size(tensorPCA,1)
+    for i = 1:length(tensorPCA)/stepSize
+        start_idx = stepSize * i - 1;      % 窗口起始索引（1, 3, 5,...）
+        end_idx = min(start_idx + windowSize, length(tensorPCA));  % 窗口结束索引（5,7,9,...），防止越界
+        reduced_data(n,i) = sum(tensorPCA(n,start_idx:end_idx));
+    end
+end
 
-tensorPCA = smoothedTensor(:,idx,:);
+figure
 %allScores = [];
-for rr = 1:2
+for rr = 1:length(regionSelected)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
-    region_neurons = tensorPCA(region_idx, :, :);
+    region_neurons = reduced_data(region_idx, :, :);
 
     % Generate PCA
-    nexttile(rr+2)
+    nexttile(rr+length(regionSelected))
 
     % find
-    averageTrials = mean(region_neurons,3);
+    %averageTrials = mean(region_neurons,3);
 
     % Run the PCA
-    [coefs, scores, ~, ~, explained ] = pca(averageTrials');
+    [coefs, scores, ~, ~, explained ] = pca(region_neurons');
     cumulative_variance = cumsum(explained)/100;
     K = find(cumulative_variance >= 0.80, 1); % choose K
 
@@ -280,7 +295,7 @@ for rr = 1:2
     grid on;
     %allScores(:,:,rr) = scores;
     % separate pca; can't draw together
-    nexttile(rr+4)
+    nexttile(rr+2*length(regionSelected))
     plot3(scores(:,1), scores(:,2), scores(:,3),colorSelected(rr));
     xlabel('PCA 1')
     ylabel('PCA 2')
@@ -299,9 +314,9 @@ saveas(gcf, ['figure/' sesPath '_pca.fig']);
 %% NMF
 nFactors = 5;
 figure;
-t = tiledlayout(1, 2); 
+t = tiledlayout(1, length(regionSelected)); 
 
-for rr = 1:2
+for rr = 1:length(regionSelected)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
     region_neurons = tensorPCA(region_idx, :, :);
@@ -328,29 +343,31 @@ saveas(gcf, ['figure/' sesPath '_nmf.fig']);
 
 
 %% Umap
-% Use 'run_umap' to reduce the dim to 3
+% Use 'run_umap' to reduce the dim to 2
 % try different values for n_neighbors ranging from 5 to 199
-n_components = 3;
+%plot neuron with their reception field
+n_components = 2;
 n_neighbors = 10;
 figure;
-t = tiledlayout(1, 2); 
+t = tiledlayout(1, length(regionSelected)); 
 
-for rr = 1:2
+for rr = 1:length(regionSelected)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
-    region_neurons = tensorPCA(region_idx, :, :);
+    region_neurons = binnedTensor(region_idx, :, :);
      % Generate UMAP
     nexttile(rr)
 
     % find
     averageTrials = mean(region_neurons,3);
-    [rep_UMAP, umap, clusterIdentifiers, extras]=run_umap(double(averageTrials'), ...
+    [rep_UMAP, umap, clusterIdentifiers, extras]=run_umap(double(averageTrials), ...
     'n_components', n_components, 'n_neighbors', n_neighbors, 'verbose', 'none');
     % plot coef by signals
-    plot3(rep_UMAP(:,1), rep_UMAP(:,2), rep_UMAP(:,3),colorSelected(rr));
+    %scatter3(rep_UMAP(:,1), rep_UMAP(:,2), rep_UMAP(:,3),colorSelected(rr));
+    scatter(rep_UMAP(:,1), rep_UMAP(:,2),colorSelected(rr),'filled');
     xlabel('UMAP 1')
     ylabel('UMAP 2')
-    zlabel('UMAP 3')
+    %zlabel('UMAP 3')
     title('UMAP on',regions.name(region_code))
     hold on
 
