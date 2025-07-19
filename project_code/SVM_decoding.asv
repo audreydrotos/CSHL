@@ -106,20 +106,15 @@ idx = 1:10:51;
 time_xaxis = time(idx);
 
 % regions
-regions = [3 10];
-
-% subset for our neurons
-region_code = 10; % LGd
-region_idx = neurons.region == region_code;
-region_neurons = tensorPCA(region_idx, :, :);
+regions = [3 10 8];
 
 % 5 fold cross validation
 cv = cvpartition(y,'KFold', 5);
 
 % What do we want to decode? 
-y = rightStim;
-% y = trials.Correct;
-% y = trials.Correct;
+% y = rightStim;
+y = trials.Correct;
+% y = S.trials.response_choice;
 
 % initialize accuracy
 accuracy = zeros(size(region_neurons,2), length(region_code));
@@ -156,15 +151,134 @@ for r = 1:length(regions)
     end
 end
 
-figure()
+figure('Position', [0 0 300 800])
+subplot(3, 1, 1)
 plot(accuracy(:,1))
 hold on
-plot(accuracy(:,2))
-legend('LGD', 'VIsp')
 ylim([0 100])
 ylabel('Accuracy')
 xlabel('Time relative to Stim. Onset')
 xticks(idx)
 xticklabels(time_xaxis)
-title({'Decoding Right Contrast', 'from VIsp activity using SVM'})
+title({'Decoding Actual Choice', 'from LGD activity using SVM'})
 hold off
+
+subplot(3, 1, 2)
+plot(accuracy(:,2))
+title({'Decoding Actual Choice', 'from VIsp activity using SVM'})
+ylabel('Accuracy')
+xlabel('Time relative to Stim. Onset')
+xticks(idx)
+ylim([0 100])
+xticklabels(time_xaxis)
+
+subplot(3, 1, 3)
+plot(accuracy(:,3))
+title({'Decoding Actual Choice', 'from TH activity using SVM'})
+ylabel('Accuracy')
+xlabel('Time relative to Stim. Onset')
+xticks(idx)
+ylim([0 100])
+xticklabels(time_xaxis)
+
+savefig('actual_choice_decoding.fig')
+
+%% Find the neurons in TH that encode choice best since this is highest 
+%% accuracy
+% set up bins needed on X axis
+nBins = size(tensorPCA, 2);
+binnedTime = 2.5;
+msBin = binnedTime/nBins;
+time = -0.5:msBin:2;
+% bin tick every 50 bins (10 values)
+idx = 1:10:51;
+time_xaxis = time(idx);
+
+% regions
+regions = [8];
+
+% What do we want to decode? 
+y = trials.Correct;
+
+% 5 fold cross validation
+cv = cvpartition(y,'KFold', 5);
+
+% initialize accuracy
+accuracy = [];
+topNeuronsMatrix = [];
+
+% select region to look at
+region_code = 8; % LGd
+region_idx = neurons.region == region_code;
+region_neurons = tensorPCA(region_idx, :, :);
+
+% Perform decoding across time windows
+for w = 1:size(region_neurons, 2)
+    
+    % Get the current window of data
+    x_window = squeeze(region_neurons(:, w, :));
+    x = x_window';
+    
+    % Initialize matrix
+    acc = zeros(cv.NumTestSets, 1);
+    allScores = [];
+    allLabels = [];
+    
+    % Train and test the model
+    for j = 1:cv.NumTestSets  % Renaming outer loop index to avoid conflict
+        trainX = x(cv.training(j), :);
+        testX = x(cv.test(j), :);
+        trainY = y(cv.training(j));
+        testY = y(cv.test(j));
+
+        % Train the classifier using fitcecoc
+        model = fitcecoc(trainX, trainY);
+        [pred, score] = predict(model, testX);
+        acc(j) = mean(pred == testY);
+        
+        % Initialize matrix to store coefficients
+        coefMatrix = [];
+        
+        % Loop over the single binary classifier and extract coefficients
+        if length(model.BinaryLearners) == 1
+            % Only one binary classifier in a binary classification problem
+            coefMatrix = model.BinaryLearners{1}.Beta;
+        end
+        
+        % Now coefMatrix is a vector (for binary classification)
+        % Each element corresponds to the weight of a feature (neuron)
+        
+        % Compute the absolute value of the coefficients to rank features by importance
+        absCoef = abs(coefMatrix);  % Take absolute value of coefficients
+        
+        % Rank neurons based on their importance (higher means more important)
+        [sortedCoeffs, sortedIdx] = sort(absCoef, 'descend');
+        
+        % Display the most informative neuron
+        topNeuron = sortedIdx(1);  % Get the index of the most informative neuron
+        disp('Most informative neuron:');
+        disp(topNeuron);
+    end
+    
+    % Store the top neuron for each time window
+    topNeuronsMatrix(w, :) = topNeuron;
+    accuracy(w) = mean(acc) * 100;
+end
+
+%% Neuron 166 is the most informative neuron for correct choice (of the TH neurons)
+% plot a rastor of this neuron's responses
+
+% select region to look at
+region_code = 8; % LGd
+region_idx = neurons.region == region_code;
+region_neurons = tensorPCA(region_idx, :, :);
+
+% plot average response of this neuron for each choice
+best_neuron = region_neurons(166,:,:);
+
+% find the unique correct choice options
+% unique(trials.Correct) gives 0 and 1 as options
+correct_idx = trials.Correct == 0;
+incorrect_idx = trials.Correct == 1;
+
+correct_trial
