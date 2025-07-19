@@ -106,6 +106,49 @@ end
 
 % save the binned tensor
 save(['postprocessed_data/' sesPath '_binnedTensor.mat'], 'binnedTensor')
+
+%% Plot tuning curves according to stimulus and firing rate
+behavior = trials.contrast;%can change it
+behavior = trials.turn;
+behavior_value = unique(behavior);
+valueNum = length(behavior_value);
+firing_Onbehavior = zeros(valueNum,nTrials);
+time_Onbehavior = zeros(valueNum,nTrials);
+figure
+for rr = 1:2
+    region_code = regionSelected(rr);
+    region_idx = neurons.region == region_code;
+    region_neurons = binnedTensor(region_idx, :, :);
+
+    summedTensor = sum(binnedTensor,2);
+    neuronNum = size(region_neurons,1);
+    for i = 1:neuronNum
+        for j = 1:nTrials
+            for v = 1:valueNum
+                if behavior(j)==behavior_value(v)
+                    firing_Onbehavior(v,i) = firing_Onbehavior(v,i)+summedTensor(i, 1, j);
+                    time_Onbehavior(v,i) = time_Onbehavior(v,i)+1;
+                end
+            end
+        end
+    end
+    firingRate_Onbehavior = firing_Onbehavior./time_Onbehavior;
+    [peak_values, peak_stimuli] = max(firingRate_Onbehavior, [], 1);
+    neuron_groups = cell(valueNum, 1);
+    title(regions.name(region_code))
+    % Group neurons by their peak stimulus
+    for stim = 1:valueNum
+        subplot(valueNum,2,rr+(stim-1)*2)
+        neuron_groups{stim} = find(peak_stimuli == stim);
+        plot(behavior_value,firingRate_Onbehavior(:,neuron_groups{stim}));
+        hold on
+        %add mean line
+        meanRate = mean(firingRate_Onbehavior(:,neuron_groups{stim}),2);
+        plot(behavior_value,meanRate, 'k', 'LineWidth', 3);
+        title(['neuronum = ',size(firingRate_Onbehavior(:,neuron_groups{stim}),2)])
+    end    
+end
+
 %% Plot traces relative to stim, response, and go
 % We already have two regions and we need to plot them together. Make it
 % parameters.
