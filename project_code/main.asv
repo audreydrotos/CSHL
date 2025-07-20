@@ -24,7 +24,32 @@ regionTable = table( histcounts(neurons.region(neurons.probe==0),...
    'VariableNames',["Probe 0" "Probe 1"],'RowNames', regions.name(1:regions.N-1));
 %We select LGd(3) and VISp(10)
 regionSelected = [3,10,8];
-colorSelected = ['r','b'];
+colorSelected = ['r','b','g'];
+colorTurned = ['r','b','g'];
+% Create a 9x3 color matrix (each row is an RGB color)
+colors = zeros(9, 3);
+
+% Red getting lighter (1:4) - from dark red to light red
+red_dark = [0.8, 0, 0];      % Dark red
+red_light = [1, 0.7, 0.7];   % Light red
+for i = 1:4
+    t = (i-1) / 3;  % Interpolation factor from 0 to 1
+    colors(i, :) = (1-t) * red_dark + t * red_light;
+end
+
+% Blue (5)
+colors(5, :) = [0, 0, 1];    % Pure blue
+
+% Green getting deeper (6:9) - from light green to dark green
+green_light = [0.7, 1, 0.7]; % Light green
+green_dark = [0, 0.6, 0];    % Dark green
+for i = 6:9
+    t = (i-6) / 3;  % Interpolation factor from 0 to 1
+    colors(i, :) = (1-t) * green_light + t * green_dark;
+end
+
+colorsContrast = colors;
+
 %disp(regionTable) % print out region names
 % fprintf('\nProbe 0 region counts: %d %d %d %d %d %d %d %d %d',histcounts(neurons.region(neurons.probe==0),.5:1:(regions.N-.5)))
 % fprintf('\nProbe 1 region counts: %d %d %d %d %d %d %d %d %d',histcounts(neurons.region(neurons.probe==1),.5:1:(regions.N-.5)))
@@ -53,7 +78,7 @@ end
 
 %% Plot average firing rate as histogram
 figure()
-for rr = 1:2
+for rr = 1:length(regionSelected)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
     region_neurons = spikeMatrix(region_idx);
@@ -210,11 +235,6 @@ end
 %saveas(gcf, ['figure/' sesPath '_tuning curve_normalized.fig']);
 saveas(gcf, ['figure/' sesPath '_tuning curve_original.fig']);
 
-
-
-
-
-
 %% Plot traces relative to stim, response, and go
 % We already have two regions and we need to plot them together. Make it
 % parameters.
@@ -225,9 +245,9 @@ smoothedTensor = movmean(binnedTensor, [5 5], 2);
 means = [];
 
 figure;
-t = tiledlayout(3, 2);  % 3行2列网格
+t = tiledlayout(3, length(regionSelected));  % 3行2列网格
 
-for rr = 1:2
+for rr = 1:length(regionSelected)
     nexttile(rr)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
@@ -255,19 +275,26 @@ idx = 1:stepSize:size(smoothedTensor,2);
 
 tensorPCA = smoothedTensor(:,idx,:);
 %allScores = [];
-for rr = 1:2
+figure
+for rr = 1:length(regionSelected)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
     region_neurons = tensorPCA(region_idx, :, :);
-
+    
     % Generate PCA
-    nexttile(rr+2)
-
-    % find
+    nexttile(rr+length(regionSelected))
+   
+    color_sequence = parula(valueNum); 
+    % find trials we want to summarize
+    % behavior_idx = trial.
+    % averageTrials = mw
+    %
     averageTrials = mean(region_neurons,3);
-
+    % averageBins = mean(region_neurons,2);
+    % averageBins = squeeze(averageBins);
     % Run the PCA
-    [coefs, scores, ~, ~, explained ] = pca(averageTrials', 'NumComponents', 3);
+    [coefs, scores, ~, ~, explained ] = pca(averageTrials');
+    %[coefs, scores, ~, ~, explained ] = pca(averageBins');
     cumulative_variance = cumsum(explained)/100;
     K = find(cumulative_variance >= 0.80, 1); % choose K
 
@@ -280,8 +307,53 @@ for rr = 1:2
     grid on;
     %allScores(:,:,rr) = scores;
     % separate pca; can't draw together
-    nexttile(rr+4)
+    nexttile(rr+2*length(regionSelected))
     plot3(scores(:,1), scores(:,2), scores(:,3),colorSelected(rr));
+    xlabel('PCA 1')
+    ylabel('PCA 2')
+    zlabel('PCA 3')
+    title('PCA on',regions.name(region_code))
+ 
+end
+
+figure
+for rr = 1:length(regionSelected)
+    region_code = regionSelected(rr);
+    region_idx = neurons.region == region_code;
+    region_neurons = tensorPCA(region_idx, :, :);
+    
+    % Generate PCA
+    nexttile(rr+length(regionSelected))
+    
+    % find trials we want to summarize
+    
+    %averageTrials = mean(region_neurons,3);
+    averageBins = mean(region_neurons,2);
+    averageBins = squeeze(averageBins);
+    % Run the PCA
+    %[coefs, scores, ~, ~, explained ] = pca(averageTrials');
+    [coefs, scores, ~, ~, explained ] = pca(averageBins');
+    cumulative_variance = cumsum(explained)/100;
+    K = find(cumulative_variance >= 0.80, 1); % choose K
+
+    %plot Scree-plot to decide K
+    plot(1:length(explained), explained, 'bo-', 'LineWidth', 2);
+    xlabel('Principal Component');
+    ylabel('Variance Explained (%)');
+    title(['Scree Plot for PCA on',regions.name(regionSelected(rr))],[num2str(K),' component count for 80% variance']);
+    xlim([0 10])
+    grid on;
+    %allScores(:,:,rr) = scores;
+    % separate pca; can't draw together
+    nexttile(rr+2*length(regionSelected))
+    %plot different color to different trials
+    color_sequence = parula(valueNum); 
+    for i = 1:valueNum
+        currentScore = scores(behavior==behavior_value(i),:);
+        scatter3(currentScore(:,1), currentScore(:,2),currentScore(:,3));
+        hold on
+    end
+    
     xlabel('PCA 1')
     ylabel('PCA 2')
     zlabel('PCA 3')
@@ -299,9 +371,9 @@ saveas(gcf, ['figure/' sesPath '_pca.fig']);
 %% NMF
 nFactors = 5;
 figure;
-t = tiledlayout(1, 2); 
+t = tiledlayout(1, length(regionSelected)); 
 
-for rr = 1:2
+for rr = 1:length(regionSelected)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
     region_neurons = tensorPCA(region_idx, :, :);
@@ -330,29 +402,60 @@ saveas(gcf, ['figure/' sesPath '_nmf.fig']);
 %% Umap
 % Use 'run_umap' to reduce the dim to 3
 % try different values for n_neighbors ranging from 5 to 199
-n_components = 3;
+% Umap need to classify neurons
+n_components = 2;
 n_neighbors = 10;
 figure;
-t = tiledlayout(1, 2); 
+t = tiledlayout(1, length(regionSelected)); 
 
-for rr = 1:2
+for rr = 1:length(regionSelected)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
-    region_neurons = tensorPCA(region_idx, :, :);
+    
      % Generate UMAP
     nexttile(rr)
+    region_neurons = binnedTensor(region_idx, :, :);
+
+    summedTensor = sum(region_neurons,2);
+    neuronNum = size(region_neurons,1);
+    
+    firing_Onbehavior = zeros(valueNum,neuronNum);
+    time_Onbehavior = zeros(valueNum,neuronNum);
+
+    for i = 1:neuronNum
+        for j = 1:nTrials
+            for v = 1:valueNum
+                if behavior(j)==behavior_value(v)
+                    firing_Onbehavior(v,i) = firing_Onbehavior(v,i)+summedTensor(i, 1, j);
+                    time_Onbehavior(v,i) = time_Onbehavior(v,i)+1;
+                end
+            end
+        end
+    end
+
+    firingRate_Onbehavior = firing_Onbehavior./time_Onbehavior;
+    [peak_values, peak_stimuli] = max(firingRate_Onbehavior, [], 1);
 
     % find
+    region_neurons = tensorPCA(region_idx, :, :);
     averageTrials = mean(region_neurons,3);
-    [rep_UMAP, umap, clusterIdentifiers, extras]=run_umap(double(averageTrials'), ...
+    rng(42);
+    [rep_UMAP, umap, clusterIdentifiers, extras]=run_umap(double(averageTrials), ...
     'n_components', n_components, 'n_neighbors', n_neighbors, 'verbose', 'none');
     % plot coef by signals
-    plot3(rep_UMAP(:,1), rep_UMAP(:,2), rep_UMAP(:,3),colorSelected(rr));
+    % plot using different neurons
+    color_sequence = parula(valueNum); 
+
+    for i = 1:valueNum
+        currentUmap= rep_UMAP(peak_stimuli==i,:);
+        scatter(currentUmap(:,1), currentUmap(:,2),'filled');
+        hold on
+    end
+    
     xlabel('UMAP 1')
     ylabel('UMAP 2')
-    zlabel('UMAP 3')
+    %zlabel('UMAP 3')
     title('UMAP on',regions.name(region_code))
-    hold on
 
 end
 
