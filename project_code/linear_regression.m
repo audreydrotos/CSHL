@@ -9,6 +9,10 @@
 addpath(genpath('..'))
 
 close all; clear; clc; rng(123);
+binSize = 0.005;
+timeWindow = [-0.5 2];
+%change window here
+edges = timeWindow(1):binSize:timeWindow(2);
 path2data = 'steinmetz_selected_data/';
 %% pick a session
 sesPath = 'Moniz_2017-05-16'; % session with both motor and sensory areas

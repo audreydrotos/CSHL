@@ -110,8 +110,8 @@ end
 save(['postprocessed_data/' sesPath '_binnedTensor.mat'], 'binnedTensor')
 
 %% Plot tuning curves according to stimulus and firing rate
-behavior = trials.contrast;%can change it
-%behavior = trials.turn;
+%behavior = trials.contrast;%can change it
+behavior = trials.turn;
 behavior_value = unique(behavior);
 valueNum = length(behavior_value);
 

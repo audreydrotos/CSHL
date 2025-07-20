@@ -3,7 +3,7 @@
 % try different values for n_neighbors ranging from 5 to 199
 % Umap need to classify neurons
 n_components = 2;
-n_neighbors = 10;
+n_neighbors = 20;
 figure;
 t = tiledlayout(1, length(regionSelected)); 
 
