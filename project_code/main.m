@@ -108,8 +108,8 @@ end
 save(['postprocessed_data/' sesPath '_binnedTensor.mat'], 'binnedTensor')
 
 %% Plot tuning curves according to stimulus and firing rate
-behavior = trials.contrast;%can change it
-%behavior = trials.turn;
+% behavior = trials.contrast;%can change it
+behavior = trials.turn;
 behavior_value = unique(behavior);
 valueNum = length(behavior_value);
 
@@ -419,11 +419,11 @@ for rr = 1:length(regionSelected)
     'n_components', n_components, 'n_neighbors', n_neighbors, 'verbose', 'none');
     % plot coef by signals
     % plot using different neurons
-    color_sequence = parula(valueNum); 
+    color_sequence = cool(valueNum); 
 
     for i = 1:valueNum
         currentUmap= rep_UMAP(peak_stimuli==i,:);
-        scatter(currentUmap(:,1), currentUmap(:,2),'filled');
+        scatter(currentUmap(:,1), currentUmap(:,2),'filled', 'CData', color_sequence(i,:));
         hold on
     end
     
