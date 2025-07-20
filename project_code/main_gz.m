@@ -133,8 +133,8 @@ end
 save(['postprocessed_data/' sesPath '_binnedTensor.mat'], 'binnedTensor')
 
 %% Plot tuning curves according to stimulus and firing rate
-% behavior = trials.contrast;%can change it
-behavior = trials.turn;
+behavior = trials.contrast;%can change it
+%behavior = trials.turn;
 behavior_value = unique(behavior);
 valueNum = length(behavior_value);
 
@@ -347,10 +347,10 @@ for rr = 1:length(regionSelected)
     % separate pca; can't draw together
     nexttile(rr+2*length(regionSelected))
     %plot different color to different trials
-    color_sequence = parula(valueNum); 
+    color_sequence = cool(valueNum);  
     for i = 1:valueNum
         currentScore = scores(behavior==behavior_value(i),:);
-        scatter3(currentScore(:,1), currentScore(:,2),currentScore(:,3));
+        scatter3(currentScore(:,1), currentScore(:,2),currentScore(:,3),50,color_sequence(i,:),'filled');
         hold on
     end
     
@@ -444,11 +444,11 @@ for rr = 1:length(regionSelected)
     'n_components', n_components, 'n_neighbors', n_neighbors, 'verbose', 'none');
     % plot coef by signals
     % plot using different neurons
-    color_sequence = cool(valueNum); 
+    color_sequence = parula(valueNum); 
 
     for i = 1:valueNum
         currentUmap= rep_UMAP(peak_stimuli==i,:);
-        scatter(currentUmap(:,1), currentUmap(:,2),'filled', 'CData', color_sequence(i,:));
+        scatter(currentUmap(:,1), currentUmap(:,2),'filled');
         hold on
     end
     
