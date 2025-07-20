@@ -448,13 +448,13 @@ for rr = 1:length(regionSelected)
 
     for i = 1:valueNum
         currentUmap= rep_UMAP(peak_stimuli==i,:);
-        scatter(currentUmap(:,1), currentUmap(:,2),'filled', 'CData', color_sequence(i,:));
+        scatter3(currentUmap(:,1), currentUmap(:,2), 'filled', 'CData', color_sequence(i,:));
         hold on
     end
     
     xlabel('UMAP 1')
     ylabel('UMAP 2')
-    %zlabel('UMAP 3')
+    % zlabel('UMAP 3')
     title('UMAP on',regions.name(region_code))
 
 end
