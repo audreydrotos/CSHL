@@ -108,8 +108,8 @@ end
 save(['postprocessed_data/' sesPath '_binnedTensor.mat'], 'binnedTensor')
 
 %% Plot tuning curves according to stimulus and firing rate
-behavior = trials.contrast;%can change it
-%behavior = trials.turn;
+%behavior = trials.contrast;%can change it
+behavior = trials.turn;
 behavior_value = unique(behavior);
 valueNum = length(behavior_value);
 
@@ -210,8 +210,6 @@ end
 %saveas(gcf, ['figure/' sesPath '_tuning curve_normalized.fig']);
 saveas(gcf, ['figure/' sesPath '_tuning curve_original.fig']);
 
-
-
 %% Plot traces relative to stim, response, and go
 % We already have two regions and we need to plot them together. Make it
 % parameters.
@@ -222,7 +220,7 @@ smoothedTensor = movmean(binnedTensor, [5 5], 2);
 means = [];
 
 figure;
-t = tiledlayout(3, 1);  % 3行2列网格
+t = tiledlayout(3, length(regionSelected));  % 3行2列网格
 
 for rr = 1:length(regionSelected)
     nexttile(rr)
@@ -239,50 +237,39 @@ for rr = 1:length(regionSelected)
        hold on
     end
     mean_resp = mean(means);
-
-    xlabel('Time')
-    ax = gca;   
-    set(ax, 'XTickLabel', compose('%.2f', [-0.5:0.25:2])); 
-
-    ylabel('Spike count per bin')
+    xlabel('Time bins')
+    ylabel('Response amplitude')
     title(regions.name(regionSelected(rr)))
     plot(mean_resp, 'k', 'LineWidth', 3);
     hold off
 end
 
 %% Reduce the values of trial for PCA
-% stepSize = 10;
-% idx = 1:stepSize:size(smoothedTensor,2);
-% plot the behavior with color
-stepSize = 100;
-windowSize  = 50;
-temp = permute(binnedTensor, [1, 3, 2]); % 维度顺序变为a×c×b
-tensorPCA = reshape(temp, size(temp,1), size(temp,2)*size(temp,3)); % 按a行、b*c列展开
-reduced_data= zeros(size(tensorPCA,1),length(tensorPCA)/stepSize);
-% 滑动窗口求和
-for n = 1:size(tensorPCA,1)
-    for i = 1:length(tensorPCA)/stepSize
-        start_idx = stepSize * i - 1;      % 窗口起始索引（1, 3, 5,...）
-        end_idx = min(start_idx + windowSize, length(tensorPCA));  % 窗口结束索引（5,7,9,...），防止越界
-        reduced_data(n,i) = sum(tensorPCA(n,start_idx:end_idx));
-    end
-end
+stepSize = 10;
+idx = 1:stepSize:size(smoothedTensor,2);
 
-figure
+tensorPCA = smoothedTensor(:,idx,:);
 %allScores = [];
+figure
 for rr = 1:length(regionSelected)
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
-    region_neurons = reduced_data(region_idx, :, :);
-
+    region_neurons = tensorPCA(region_idx, :, :);
+    
     % Generate PCA
     nexttile(rr+length(regionSelected))
-
-    % find
-    %averageTrials = mean(region_neurons,3);
-
+   
+    color_sequence = parula(valueNum); 
+    % find trials we want to summarize
+    % behavior_idx = trial.
+    % averageTrials = mw
+    %
+    averageTrials = mean(region_neurons,3);
+    % averageBins = mean(region_neurons,2);
+    % averageBins = squeeze(averageBins);
     % Run the PCA
-    [coefs, scores, ~, ~, explained ] = pca(region_neurons');
+    [coefs, scores, ~, ~, explained ] = pca(averageTrials');
+    %[coefs, scores, ~, ~, explained ] = pca(averageBins');
     cumulative_variance = cumsum(explained)/100;
     K = find(cumulative_variance >= 0.80, 1); % choose K
 
@@ -303,6 +290,51 @@ for rr = 1:length(regionSelected)
     title('PCA on',regions.name(region_code))
  
 end
+
+figure
+for rr = 1:length(regionSelected)
+    region_code = regionSelected(rr);
+    region_idx = neurons.region == region_code;
+    region_neurons = tensorPCA(region_idx, :, :);
+    
+    % Generate PCA
+    nexttile(rr+length(regionSelected))
+    
+    % find trials we want to summarize
+    
+    %averageTrials = mean(region_neurons,3);
+    averageBins = mean(region_neurons,2);
+    averageBins = squeeze(averageBins);
+    % Run the PCA
+    %[coefs, scores, ~, ~, explained ] = pca(averageTrials');
+    [coefs, scores, ~, ~, explained ] = pca(averageBins');
+    cumulative_variance = cumsum(explained)/100;
+    K = find(cumulative_variance >= 0.80, 1); % choose K
+
+    %plot Scree-plot to decide K
+    plot(1:length(explained), explained, 'bo-', 'LineWidth', 2);
+    xlabel('Principal Component');
+    ylabel('Variance Explained (%)');
+    title(['Scree Plot for PCA on',regions.name(regionSelected(rr))],[num2str(K),' component count for 80% variance']);
+    xlim([0 10])
+    grid on;
+    %allScores(:,:,rr) = scores;
+    % separate pca; can't draw together
+    nexttile(rr+2*length(regionSelected))
+    %plot different color to different trials
+    color_sequence = parula(valueNum); 
+    for i = 1:valueNum
+        currentScore = scores(behavior==behavior_value(i),:);
+        plot(currentScore(:,1), currentScore(:,2));
+        hold on
+    end
+    
+    xlabel('PCA 1')
+    ylabel('PCA 2')
+    zlabel('PCA 3')
+    title('PCA on',regions.name(region_code))
+ 
+end
 % nexttile([1, 2]);
 % for rr = 1:2
 %     % plot coef by signals
@@ -314,9 +346,9 @@ saveas(gcf, ['figure/' sesPath '_pca.fig']);
 %% NMF
 nFactors = 5;
 figure;
-t = tiledlayout(1, length(regionSelected)); 
+t = tiledlayout(1, 2); 
 
-for rr = 1:length(regionSelected)
+for rr = 1:2
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
     region_neurons = tensorPCA(region_idx, :, :);
@@ -343,31 +375,29 @@ saveas(gcf, ['figure/' sesPath '_nmf.fig']);
 
 
 %% Umap
-% Use 'run_umap' to reduce the dim to 2
+% Use 'run_umap' to reduce the dim to 3
 % try different values for n_neighbors ranging from 5 to 199
-%plot neuron with their reception field
-n_components = 2;
+n_components = 3;
 n_neighbors = 10;
 figure;
-t = tiledlayout(1, length(regionSelected)); 
+t = tiledlayout(1, 2); 
 
-for rr = 1:length(regionSelected)
+for rr = 1:2
     region_code = regionSelected(rr);
     region_idx = neurons.region == region_code;
-    region_neurons = binnedTensor(region_idx, :, :);
+    region_neurons = tensorPCA(region_idx, :, :);
      % Generate UMAP
     nexttile(rr)
 
     % find
     averageTrials = mean(region_neurons,3);
-    [rep_UMAP, umap, clusterIdentifiers, extras]=run_umap(double(averageTrials), ...
+    [rep_UMAP, umap, clusterIdentifiers, extras]=run_umap(double(averageTrials'), ...
     'n_components', n_components, 'n_neighbors', n_neighbors, 'verbose', 'none');
     % plot coef by signals
-    %scatter3(rep_UMAP(:,1), rep_UMAP(:,2), rep_UMAP(:,3),colorSelected(rr));
-    scatter(rep_UMAP(:,1), rep_UMAP(:,2),colorSelected(rr),'filled');
+    plot3(rep_UMAP(:,1), rep_UMAP(:,2), rep_UMAP(:,3),colorSelected(rr));
     xlabel('UMAP 1')
     ylabel('UMAP 2')
-    %zlabel('UMAP 3')
+    zlabel('UMAP 3')
     title('UMAP on',regions.name(region_code))
     hold on
 
